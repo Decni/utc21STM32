@@ -498,6 +498,7 @@ void TimerProcess_SPI(void) {
 */
 static void ShellCallback_GetRecord(char* arg) {
     tTriDataNode *tmpTriNode;
+    tNode        *tmpNode;
     int32_t       tmpListCnt;
     struct tm    *tmpDate;
     uint32_t      tmpTime, tmpMs, tmpUs, tmpNs;
@@ -519,20 +520,22 @@ static void ShellCallback_GetRecord(char* arg) {
     }
     
     ShellPakaged(RecordHead);
-
-    tmpTriNode = getNodeParent(tTriDataNode, node, listGetFirst(TriList));
+    tmpNode = listGetFirst(TriList);
+    if (tmpNode == (tNode*)0) {
+        return;
+    }
     
     for (uint16_t i = 0; i < tmpListCnt; i++) {
-        
+        tmpTriNode = getNodeParent(tTriDataNode, node, tmpNode);
         tmpDate    = localtime((time_t*)&(tmpTriNode->date));
         tmpTime    = tmpTriNode->time.item.tim / 2;                    /*  以10ns为单位                  */
         tmpMs      = tmpTime / 100000;
         tmpUs      = (tmpTime % 100000) / 100;
         tmpNs      = tmpTime % 100;
-        
+                                                                       /*  序号                          */
         tmpIndex   = sprintf(tmpBuff, "   %2u       \033[34;1m", i + 1);
         
-        if (tmpTriNode->time.item.num > 3) {
+        if (tmpTriNode->time.item.num > 3) {                           /*  通道号                        */
             tmpBuff[tmpIndex++]   = 'P';
             tmpBuff[tmpIndex + 1] = '0' + tmpTriNode->time.item.num % 3;
         } else if (tmpTriNode->time.item.num > 0) {
@@ -551,13 +554,13 @@ static void ShellCallback_GetRecord(char* arg) {
                                     "\033[0m     %.4u-%.2u-%.2u %.2u:%.2u:%.2u.%.3u.%.3u.%.2u"endl,
                                     tmpDate->tm_year + 1900, tmpDate->tm_mon + 1, tmpDate->tm_mday,
                                     tmpDate->tm_hour, tmpDate->tm_min, tmpDate->tm_sec,
-                                    tmpMs, tmpUs, tmpNs);
+                                    tmpMs, tmpUs, tmpNs);              /*  时间戳                        */
         tmpBuff[tmpIndex] = '\0';
 
         ShellPakaged(tmpBuff);
         
-        tmpTriNode = getNodeParent(tTriDataNode, node, listGetNext(TriList, (tNode*)&tmpTriNode));
-        if (tmpTriNode == (tTriDataNode*)0) {
+        tmpNode = listGetNext(TriList, tmpNode);
+        if (tmpNode == (tNode*)0) {
             break;
         }
     }

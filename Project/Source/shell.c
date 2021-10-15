@@ -131,13 +131,19 @@ void ShellPakaged(const char* format, ...) {
     shell·¢ËÍº¯Êý
 */
 void ShellTransmit(void) {
+    tNode *pNode;
+    
     if (ShellComState == ShellCom_Idle) {
         if (ShellEcho.msgIndex != ShellEcho.msgCnt) {
             ShellComState = ShellCom_Echo;
             USART_SendData(Shell_COM, ShellEcho.buff[ShellEcho.msgIndex++]);
             
         } else if (listGetCount(&ShellTxList) > 0) {
-            pShellTxNode  = getNodeParent(tShellTxNode, node, listRemoveFirst(&ShellTxList));
+            pNode = listRemoveFirst(&ShellTxList);
+            if (pNode == (tNode*)0) {
+                return;
+            }
+            pShellTxNode  = getNodeParent(tShellTxNode, node, pNode);
             ShellComState = ShellCom_Transmit;
             USART_SendData(Shell_COM, pShellTxNode->buff[pShellTxNode->msgIndex++]);
         }
@@ -189,39 +195,52 @@ void ShellReceve(void) {
 void ShellProcess (void) {
     tShellRxNode  *tmpRxNode;
     tShellCmdNode *tmpCmdNode;
-    tNode         *pNode;
+    tNode         *pNode, *pmNode;
     char          *token;
     
-    if (listGetCount(&ShellRxList) > 0) {
-        tmpRxNode = getNodeParent(tShellRxNode, node, listRemoveFirst(&ShellRxList));
-        pNode     = listGetFirst(&ShellCmdList);
-        token     = strtok((char*)&(tmpRxNode->buff), DELIM);
+    if (listGetCount(&ShellRxList) <= 0) {
+        return;
+    }
+    
+    pmNode = listRemoveFirst(&ShellRxList);
+    if (pmNode == (tNode*)0) {
+        return;
+    }
+    
+    tmpRxNode = getNodeParent(tShellRxNode, node, pmNode);
+    pNode     = listGetFirst(&ShellCmdList);
+    if (pNode == (tNode*)0) {
+        return;
+    }
+    token     = strtok((char*)&(tmpRxNode->buff), DELIM);
 
 
-        while (pNode != (tNode*)0) {
-            tmpCmdNode = getNodeParent(tShellCmdNode, node, pNode);
-            
-            if (strcmp(token, tmpCmdNode->cmd) == 0) {
-                token = strtok(NULL, DELIM);
-                if (strstr(token, "-h")) {
-                    ShellPakaged(tmpCmdNode->help);
-                } else if (tmpCmdNode->fun != NULL) {
-                    
-                    tmpCmdNode->fun(token);
-                }
+    while (pNode != (tNode*)0) {
+        tmpCmdNode = getNodeParent(tShellCmdNode, node, pNode);
+        
+        if (strcmp(token, tmpCmdNode->cmd) == 0) {
+            token = strtok(NULL, DELIM);
+            if (strstr(token, "-h")) {
+                ShellPakaged(tmpCmdNode->help);
+            } else if (tmpCmdNode->fun != NULL) {
                 
-               memFree(&ShellRxMem, tmpRxNode);
-               ShellPakaged(Green(KD>\040)); 
-               return;
+                tmpCmdNode->fun(token);
             }
             
-            pNode = listGetNext(&ShellCmdList, &(tmpCmdNode->node));
+           memFree(&ShellRxMem, tmpRxNode);
+           ShellPakaged(Green(KD>\040)); 
+           return;
         }
         
-        memFree(&ShellRxMem, tmpRxNode);
-        ShellPakaged(UnknowCmd);
-        ShellPakaged(Green(KD>\040));
+        pNode = listGetNext(&ShellCmdList, pNode);
+        if (pNode == (tNode*)0) {
+            break;
+        }
     }
+    
+    memFree(&ShellRxMem, tmpRxNode);
+    ShellPakaged(UnknowCmd);
+    ShellPakaged(Green(KD>\040));
 }
 
 /*

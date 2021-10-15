@@ -225,6 +225,18 @@ static void ScreenMsg_cTriChannel (void *arg) {
 static void ScreenMsg_wTriChannel (void *arg) {
     tScreenTxNode *tmpTxNode;
     tTriDataNode  *tmpTriNode;
+    tNode         *tmpNode;
+    
+    if (listGetCount(TriList) <= 0) {
+        return;
+    }
+    
+    tmpNode = listGetFirst(TriList);
+    if (tmpNode == (tNode*)0) {
+        return;
+    }
+    
+    tmpTriNode = getNodeParent(tTriDataNode, node, tmpNode);
     
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
@@ -243,24 +255,21 @@ static void ScreenMsg_wTriChannel (void *arg) {
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x00;
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x01;
 
-    if (listGetCount(TriList) > 0) {
-        tmpTriNode = getNodeParent(tTriDataNode, node, listGetFirst(TriList));
-
-        if (tmpTriNode->time.item.num > 3) {
-            tmpTxNode->buff[tmpTxNode->msgCnt++]   = 'P';
-            tmpTxNode->buff[tmpTxNode->msgCnt + 1] = '0' + tmpTriNode->time.item.num % 3;
-        } else if (tmpTriNode->time.item.num > 0) {
-            
-            tmpTxNode->buff[tmpTxNode->msgCnt++]   = 'E';
-            tmpTxNode->buff[tmpTxNode->msgCnt + 1] = '0' + tmpTriNode->time.item.num;
-        } else {
-            
-            tmpTxNode->buff[tmpTxNode->msgCnt++]   = 'M';
-            tmpTxNode->buff[tmpTxNode->msgCnt + 1] = '0';
-        }
-        tmpTxNode->buff[tmpTxNode->msgCnt++] = 'I';
-        tmpTxNode->msgCnt++;
-    }   
+    if (tmpTriNode->time.item.num > 3) {
+        tmpTxNode->buff[tmpTxNode->msgCnt++]   = 'P';
+        tmpTxNode->buff[tmpTxNode->msgCnt + 1] = '0' + tmpTriNode->time.item.num % 3;
+    } else if (tmpTriNode->time.item.num > 0) {
+        
+        tmpTxNode->buff[tmpTxNode->msgCnt++]   = 'E';
+        tmpTxNode->buff[tmpTxNode->msgCnt + 1] = '0' + tmpTriNode->time.item.num;
+    } else {
+        
+        tmpTxNode->buff[tmpTxNode->msgCnt++]   = 'M';
+        tmpTxNode->buff[tmpTxNode->msgCnt + 1] = '0';
+    }
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 'I';
+    tmpTxNode->msgCnt++;
+  
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFF;
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFC;
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFF;
@@ -308,8 +317,19 @@ static void ScreenMsg_cTriDate (void *arg) {
 static void ScreenMsg_wTriDate (void *arg) {
     tScreenTxNode *tmpTxNode;
     tTriDataNode  *tmpTriNode;
+    tNode         *tmpNode;
     struct tm     *tmpDate;
     
+    if (listGetCount(TriList) <= 0) {
+        return;
+    }
+    
+    tmpNode = listGetFirst(TriList);
+    if (tmpNode == (tNode*)0) {
+        return;
+    }
+    tmpTriNode = getNodeParent(tTriDataNode, node, tmpNode);
+    tmpDate    = localtime((time_t*)&(tmpTriNode->date));
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
 #ifdef DEBUG
@@ -326,15 +346,8 @@ static void ScreenMsg_wTriDate (void *arg) {
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x03;
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x00;
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x02;
-
-    if (listGetCount(TriList) > 0) {
-        tmpTriNode = getNodeParent(tTriDataNode, node, listGetFirst(TriList));
-        tmpDate    = localtime((time_t*)&(tmpTriNode->date));
-        
-        tmpTxNode->msgCnt += sprintf((char*)&(tmpTxNode->buff[tmpTxNode->msgCnt]),
-                                    "%.4u-%.2u-%.2u",
-                                    tmpDate->tm_year + 1900, tmpDate->tm_mon + 1, tmpDate->tm_mday);  
-    }
+    tmpTxNode->msgCnt += sprintf((char*)&(tmpTxNode->buff[tmpTxNode->msgCnt]),"%.4u-%.2u-%.2u",
+                                 tmpDate->tm_year + 1900, tmpDate->tm_mon + 1, tmpDate->tm_mday);  
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFF;
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFC;
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFF;
@@ -382,9 +395,27 @@ static void ScreenMsg_cTriTime (void *arg) {
 static void ScreenMsg_wTriTime (void *arg) {
     tScreenTxNode *tmpTxNode;
     tTriDataNode  *tmpTriNode;
+    tNode         *tmpNode;
     struct tm     *tmpDate;
     uint32_t       tmpTime, tmpMs, tmpUs, tmpNs;
     
+    
+    if (listGetCount(TriList) <= 0) {
+        return;
+    }
+    
+    tmpNode = listGetFirst(TriList);
+    if (tmpNode == (tNode*)0) {
+        return;
+    }
+    
+    tmpTriNode = getNodeParent(tTriDataNode, node, tmpNode);
+    tmpDate    = localtime((time_t*)&(tmpTriNode->date));
+    tmpTime    = tmpTriNode->time.item.tim / 2;                        /*  以10ns为单位                  */
+    tmpMs      = tmpTime / 100000;
+    tmpUs      = (tmpTime % 100000) / 100;
+    tmpNs      = tmpTime % 100;
+        
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
 #ifdef DEBUG
@@ -401,20 +432,10 @@ static void ScreenMsg_wTriTime (void *arg) {
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x03;
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x00;
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x03;
-
-    if (listGetCount(TriList) > 0) {
-        tmpTriNode = getNodeParent(tTriDataNode, node, listGetFirst(TriList));
-        tmpDate    = localtime((time_t*)&(tmpTriNode->date));
-        tmpTime    = tmpTriNode->time.item.tim / 2;                        /*  以10ns为单位                  */
-        tmpMs      = tmpTime / 100000;
-        tmpUs      = (tmpTime % 100000) / 100;
-        tmpNs      = tmpTime % 100;
-
-        tmpTxNode->msgCnt += sprintf((char*)&(tmpTxNode->buff[tmpTxNode->msgCnt]),
+    tmpTxNode->msgCnt += sprintf((char*)&(tmpTxNode->buff[tmpTxNode->msgCnt]),
                                     "%.2u:%.2u:%.2u.%.3u.%.3u.%.2u",
                                     tmpDate->tm_hour, tmpDate->tm_min, tmpDate->tm_sec,
                                     tmpMs, tmpUs, tmpNs);
-    }
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFF;
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFC;
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFF;
@@ -530,6 +551,7 @@ static void ScreenMsg_cTriRecord (void *arg) {
 static void ScreenMsg_wTriRecord (void *arg) {
     tScreenTxNode *tmpTxNode;
     tTriDataNode  *tmpTriNode;
+    tNode         *tmpNode;
     int32_t        tmpListCnt;
     struct tm     *tmpDate;
     uint32_t       tmpTime, tmpMs, tmpUs, tmpNs;
@@ -538,16 +560,23 @@ static void ScreenMsg_wTriRecord (void *arg) {
     if (tmpListCnt <= 0) {
         return;
     }
-    tmpTriNode = getNodeParent(tTriDataNode, node, listGetFirst(TriList));
+    
+    tmpNode = listGetFirst(TriList);
+    if (tmpNode == (tNode*)0) {
+        return;
+    }
+    
+    
     
     for (uint16_t i = 0; i < tmpListCnt; i++) {
+        tmpTriNode = getNodeParent(tTriDataNode, node, tmpNode);
         tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);              /*  申请一块内存                  */
         if (tmpTxNode == (tScreenTxNode*)0) {
 #ifdef DEBUG
             ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
 #endif
             return;
-    }
+        }
         tmpTxNode->msgCnt = 0;
         
         tmpDate    = localtime((time_t*)&(tmpTriNode->date));
@@ -601,9 +630,9 @@ static void ScreenMsg_wTriRecord (void *arg) {
             break;
         }
         
-        tmpTriNode = getNodeParent(tTriDataNode, node, listGetNext(TriList, (tNode*)tmpTriNode));
-        if (tmpTriNode == (tTriDataNode*)0) {
-            break;
+        tmpNode = listGetNext(TriList, tmpNode);
+        if (tmpNode == (tNode*)0) {
+            return;
         }
     }
     tmpTriNode = (tTriDataNode*)0;
@@ -647,6 +676,7 @@ static void ScreenMsg_cRecord (void *arg) {
 static void ScreenMsg_wRecord (void *arg) {
     tScreenTxNode *tmpTxNode;
     tTriDataNode  *tmpTriNode;
+    tNode         *tmpNode;
     int32_t        tmpListCnt;
     struct tm     *tmpDate;
     uint32_t       tmpTime, tmpMs, tmpUs, tmpNs;
@@ -655,9 +685,14 @@ static void ScreenMsg_wRecord (void *arg) {
     if (tmpListCnt <= 0) {
         return;
     }
-    tmpTriNode = getNodeParent(tTriDataNode, node, listGetFirst(TriList));
+    
+    tmpNode = listGetFirst(TriList);
+    if (tmpNode == (tNode*)0) {
+            return;
+    }
 
     for (uint16_t i = 0; i < tmpListCnt; i++) {
+        tmpTriNode = getNodeParent(tTriDataNode, node, tmpNode);
         tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);              /*  申请一块内存                  */
         if (tmpTxNode == (tScreenTxNode*)0) {
 #ifdef DEBUG
@@ -714,9 +749,9 @@ static void ScreenMsg_wRecord (void *arg) {
 
         listAddLast(&ScreenTxList, &(tmpTxNode->node));
 
-        tmpTriNode = getNodeParent(tTriDataNode, node, listGetNext(TriList, (tNode*)tmpTriNode));
-        if (tmpTriNode == (tTriDataNode*)0) {
-            break;
+        tmpNode = listGetNext(TriList, tmpNode);
+        if (tmpNode == (tNode*)0) {
+            return;
         }
     }
     tmpTxNode  = (tScreenTxNode*)0;
@@ -729,7 +764,7 @@ static void ScreenMsg_wRecord (void *arg) {
 static void ScreenMsg_toOPTION (void *arg) {
     tScreenTxNode *tmpTxNode;
     
-        tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
+    tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
 #ifdef DEBUG
         ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
@@ -758,7 +793,7 @@ static void ScreenMsg_toOPTION (void *arg) {
 static void ScreenMsg_wPO1 (void *arg) {
     tScreenTxNode *tmpTxNode;
     
-        tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
+    tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
 #ifdef DEBUG
         ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
@@ -796,7 +831,7 @@ static void ScreenMsg_wPO1 (void *arg) {
 static void ScreenMsg_wPO2 (void *arg) {
     tScreenTxNode *tmpTxNode;
     
-        tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
+    tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
 #ifdef DEBUG
         ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
@@ -1450,6 +1485,7 @@ static void ScreenMsg_wTriBatch (void *arg) {
 static void ScreenMsg_wNrToTest (void *arg) {
     tScreenTxNode *tmpTxNode;
     tTriDataNode  *tmpTriNode;
+    tNode         *tmpNode;
     int32_t        tmpListCnt;
     struct tm     *tmpDate;
     uint32_t       tmpTime, tmpMs, tmpUs, tmpNs;
@@ -1458,7 +1494,13 @@ static void ScreenMsg_wNrToTest (void *arg) {
     if (tmpListCnt <= 0) {
         return;
     }
-    tmpTriNode = getNodeParent(tTriDataNode, node, listGetFirst(TriList));
+    
+    tmpNode = listGetFirst(TriList);
+    if (tmpNode == (tNode*)0) {
+        return;
+    }
+    
+    tmpTriNode = getNodeParent(tTriDataNode, node, tmpNode);           /*  获取触发节点                  */
     
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
@@ -1526,6 +1568,7 @@ static void ScreenMsg_wNrToTest (void *arg) {
 static void ScreenMsg_wNrToRecord (void *arg) {
     tScreenTxNode *tmpTxNode;
     tTriDataNode  *tmpTriNode;
+    tNode         *tmpNode;
     int32_t        tmpListCnt;
     struct tm     *tmpDate;
     uint32_t       tmpTime, tmpMs, tmpUs, tmpNs;
@@ -1534,7 +1577,13 @@ static void ScreenMsg_wNrToRecord (void *arg) {
     if (tmpListCnt <= 0) {
         return;
     }
-    tmpTriNode = getNodeParent(tTriDataNode, node, listGetFirst(TriList));
+    
+    tmpNode = listGetFirst(TriList);
+    if (tmpNode == (tNode*)0) {
+        return;
+    }
+    
+    tmpTriNode = getNodeParent(tTriDataNode, node, tmpNode);           /*  获取触发节点                  */
     
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
@@ -1600,8 +1649,14 @@ static void ScreenMsg_wNrToRecord (void *arg) {
     屏幕串口发送函数
 */
 void ScreenTransmit (void) {
+    tNode *tmpNode;
+    
     if ((ScreenComStateTx == ScreenComState_TransmitIdle) && (listGetCount(&ScreenTxList) > 0)) {
-        pScreenTxNode = getNodeParent(tScreenTxNode, node, listRemoveFirst(&ScreenTxList));
+        tmpNode = listRemoveFirst(&ScreenTxList);
+        if (tmpNode == (tNode*)0) {
+            return;
+        }
+        pScreenTxNode = getNodeParent(tScreenTxNode, node, tmpNode);
         
         DMA_ClearFlag(DMA1_FLAG_GL7);
         SCREEN_COM_TX_DMA1CHANNEL->CMAR = (uint32_t)&(pScreenTxNode->buff);
@@ -1648,8 +1703,9 @@ void ScreenReceve (void) {
     处理接收到的消息
 */
 void ScreenProcess(void) {
-    uint8_t       *pMsgEnd, *pMsgIndex;
     tScreenRxNode *tmpRxNode;
+    tNode         *tmpNode;
+    uint8_t       *pMsgEnd, *pMsgIndex;
     uint32_t       outDelay = 0;
     uint32_t       triDelay = 0;
     long double    tmpData  = 0;
@@ -1657,291 +1713,297 @@ void ScreenProcess(void) {
     time_t         t_time   = 0;
     
     
-    if (listGetCount(&ScreenRxList) > 0) {                             /*  接收链表有数据                */
-        tmpRxNode = getNodeParent(tScreenRxNode, node, listRemoveFirst(&ScreenRxList));
+    if (listGetCount(&ScreenRxList) <= 0) {                            /*  接收链表有数据                */
+        return;
+    }
+    
+    tmpNode = listRemoveFirst(&ScreenRxList);
+    if (tmpNode == (tNode*)0) {
+        return;
+    }
+    tmpRxNode = getNodeParent(tScreenRxNode, node, tmpNode);
+    
+    if (tmpRxNode->msgCnt < 5) {
+        return;
+    }
+    pMsgIndex = tmpRxNode->buff;
+    pMsgEnd   = pMsgIndex + tmpRxNode->msgCnt;
+
+    while (pMsgIndex < pMsgEnd) {
         
-        if (tmpRxNode->msgCnt < 5) {
-            return;
-        }
-        pMsgIndex = tmpRxNode->buff;
-        pMsgEnd   = pMsgIndex + tmpRxNode->msgCnt;
-
-        while (pMsgIndex < pMsgEnd) {
-            
-            if (*pMsgIndex != 0xEE) {                                  /*  检索包头                      */
-                pMsgIndex++;
-                continue;
-            }
+        if (*pMsgIndex != 0xEE) {                                      /*  检索包头                      */
             pMsgIndex++;
-            if (*pMsgIndex == 0xF7) {                                  /*  读取 RTC 日期                 */
-                pMsgIndex++;
-                rtcDate.tm_year = ((*pMsgIndex) >> 4) * 10 + ((*pMsgIndex) & 0x0F) + 100;
-                pMsgIndex++;                                           /*   year + 2000 - 1900           */
-                rtcDate.tm_mon  = ((*pMsgIndex) >> 4) * 10 + ((*pMsgIndex) & 0x0F) - 1;
-                pMsgIndex += 2;                                        /*  mon - 1                       */
-                rtcDate.tm_mday = ((*pMsgIndex) >> 4) * 10 + ((*pMsgIndex) & 0x0F);
-                t_time = mktime(&rtcDate);
-                SpiPackaged(Mask_GPSB, t_time);
+            continue;
+        }
+        pMsgIndex++;
+        if (*pMsgIndex == 0xF7) {                                      /*  读取 RTC 日期                 */
+            pMsgIndex++;
+            rtcDate.tm_year = ((*pMsgIndex) >> 4) * 10 + ((*pMsgIndex) & 0x0F) + 100;
+            pMsgIndex++;                                               /*   year + 2000 - 1900           */
+            rtcDate.tm_mon  = ((*pMsgIndex) >> 4) * 10 + ((*pMsgIndex) & 0x0F) - 1;
+            pMsgIndex += 2;                                            /*  mon - 1                       */
+            rtcDate.tm_mday = ((*pMsgIndex) >> 4) * 10 + ((*pMsgIndex) & 0x0F);
+            t_time = mktime(&rtcDate);
+            SpiPackaged(Mask_GPSB, t_time);
 #if DEBUG
-                ShellPakaged(Red(CONFIG)" FPGA IRIG-B Time to %#lx"endl, t_time);
-                ShellPakaged("%s"endl, asctime(&rtcDate));
+            ShellPakaged(Red(CONFIG)" FPGA IRIG-B Time to %#lx"endl, t_time);
+            ShellPakaged("%s"endl, asctime(&rtcDate));
 #endif
-                pMsgIndex += 4;
-            } else if (*pMsgIndex == 0x07) {                           /*  屏幕复位                      */
-                
-                pMsgIndex++;
-                if (*((uint32_t*)pMsgIndex) == 0xFFFFFCFF) {           /*  校验包尾                      */
-                    screenInfo.Power = true;
-                    screenMsg.rRtc(0);
-                    screenMsg.wSetBatch(0);
-                    screenMsg.wTriDelay(0);
-                    screenMsg.wTriRecord(0);
-                    screenMsg.wRecord(0);                              /*  更新缓存在 flash 中的数据     */
+            pMsgIndex += 4;
+        } else if (*pMsgIndex == 0x07) {                               /*  屏幕复位                      */
+            
+            pMsgIndex++;
+            if (*((uint32_t*)pMsgIndex) == 0xFFFFFCFF) {               /*  校验包尾                      */
+                screenInfo.Power = true;
+                screenMsg.rRtc(0);
+                screenMsg.wSetBatch(0);
+                screenMsg.wTriDelay(0);
+                screenMsg.wTriRecord(0);
+                screenMsg.wRecord(0);                                  /*  更新缓存在 flash 中的数据     */
 #if DEBUG
-                    ShellPakaged("Screen Power On."endl);
+                ShellPakaged("Screen Power On."endl);
 #endif
-                }
-            } else if (screenInfo.Power && (*pMsgIndex == 0xB1)) {     /*  控件消息                      */
+            }
+        } else if (screenInfo.Power && (*pMsgIndex == 0xB1)) {         /*  控件消息                      */
+            
+            pMsgIndex++;
+            switch (*pMsgIndex) {
+                case 0x01:                                             /*  当前画面ID通知                */
+                    screenInfo.ID  = (tScreenId)(*(pMsgIndex + 2));
+                    pMsgIndex     += 3;
+                    break;
                 
-                pMsgIndex++;
-                switch (*pMsgIndex) {
-                    case 0x01:                                         /*  当前画面ID通知                */
-                        screenInfo.ID  = (tScreenId)(*(pMsgIndex + 2));
-                        pMsgIndex     += 3;
-                        break;
-                    
-                    case 0x27:                                         /*  动画播放完毕                  */
-                        if (((tScreenId)(*(pMsgIndex + 2)) == SPLASH) && (*(pMsgIndex + 4) == 1)) {
-                            screenMsg.toOPTION(0);
-                            screenInfo.ID = OPTION;
+                case 0x27:                                             /*  动画播放完毕                  */
+                    if (((tScreenId)(*(pMsgIndex + 2)) == SPLASH) && (*(pMsgIndex + 4) == 1)) {
+                        screenMsg.toOPTION(0);
+                        screenInfo.ID = OPTION;
 #ifdef DEBUG
-                            ShellPakaged("Screen startup is complete."endl);
+                        ShellPakaged("Screen startup is complete."endl);
 #endif
-                        }
-                        pMsgIndex += 5;
-                        break;
- 
-                    case 0x11:
-                        switch (*(pMsgIndex + 2)) {
-                            
-                            case OPTION:                               /*  选项界面                      */
-                                if (*(pMsgIndex + 4) == 1) {           /*  测试按键按下                  */
-          
-                                } else {                               /*  设置按键按下                  */
+                    }
+                    pMsgIndex += 5;
+                    break;
 
-                                }
+                case 0x11:
+                    switch (*(pMsgIndex + 2)) {
+                        
+                        case OPTION:                                   /*  选项界面                      */
+                            if (*(pMsgIndex + 4) == 1) {               /*  测试按键按下                  */
+      
+                            } else {                                   /*  设置按键按下                  */
+
+                            }
+                            pMsgIndex += 8;
+                            break;
+                            
+                        case SETTING:                                  /*  设置界面                      */
+                            if (*(pMsgIndex + 4) == 0x0D) {            /*  返回按键                      */
+                                FlashOperate(FlashOp_ConfigSave);      /*  保存配置参数到flash           */
                                 pMsgIndex += 8;
                                 break;
-                                
-                            case SETTING:                              /*  设置界面                      */
-                                if (*(pMsgIndex + 4) == 0x0D) {        /*  返回按键                      */
-                                    FlashOperate(FlashOp_ConfigSave);  /*  保存配置参数到flash           */
-                                    pMsgIndex += 8;
+                            }
+
+                            switch (*(pMsgIndex + 4)) {
+                                case 0x01:                             /*  光输出1                       */
+                                    if (*(pMsgIndex + 6) != 0) {
+                                        sscanf((const char*)(pMsgIndex + 6), 
+                                                         "%Lf[0123456789.]", &tmpData);
+                                        outDelay = (uint32_t)(tmpData * 100);
+                                    }
+
+                                    screenInfo.Config->po1 = outDelay;
+                                    SpiPackaged(Mask_PO1, screenInfo.Config->po1 * 2);
                                     break;
-                                }
- 
-                                switch (*(pMsgIndex + 4)) {
-                                    case 0x01:                         /*  光输出1                       */
-                                        if (*(pMsgIndex + 6) != 0) {
-                                            sscanf((const char*)(pMsgIndex + 6), 
-                                                             "%Lf[0123456789.]", &tmpData);
-                                            outDelay = (uint32_t)(tmpData * 100);
-                                        }
+                                case 0x02:                             /*  光输出2                       */
+                                    if (*(pMsgIndex + 6) != 0) {
+                                        sscanf((const char*)(pMsgIndex + 6), 
+                                                         "%Lf[0123456789.]", &tmpData);
+                                        outDelay = (uint32_t)(tmpData * 100);
+                                    }
 
-                                        screenInfo.Config->po1 = outDelay;
-                                        SpiPackaged(Mask_PO1, screenInfo.Config->po1 * 2);
-                                        break;
-                                    case 0x02:                         /*  光输出2                       */
-                                        if (*(pMsgIndex + 6) != 0) {
-                                            sscanf((const char*)(pMsgIndex + 6), 
-                                                             "%Lf[0123456789.]", &tmpData);
-                                            outDelay = (uint32_t)(tmpData * 100);
-                                        }
+                                    screenInfo.Config->po2 = outDelay;
+                                    SpiPackaged(Mask_PO2, screenInfo.Config->po2 * 2);
+                                    break;
+                                case 0x03:                             /*  光输出3                       */
+                                    if (*(pMsgIndex + 6) != 0) {
+                                        sscanf((const char*)(pMsgIndex + 6), 
+                                                         "%Lf[0123456789.]", &tmpData);
+                                        outDelay = (uint32_t)(tmpData * 100);
+                                    }
 
-                                        screenInfo.Config->po2 = outDelay;
-                                        SpiPackaged(Mask_PO2, screenInfo.Config->po2 * 2);
-                                        break;
-                                    case 0x03:                         /*  光输出3                       */
-                                        if (*(pMsgIndex + 6) != 0) {
-                                            sscanf((const char*)(pMsgIndex + 6), 
-                                                             "%Lf[0123456789.]", &tmpData);
-                                            outDelay = (uint32_t)(tmpData * 100);
-                                        }
+                                    screenInfo.Config->po3 = outDelay;
+                                    SpiPackaged(Mask_PO3, screenInfo.Config->po3 * 2);
+                                    break;
+                                case 0x04:                             /*  光输出4                       */
+                                    if (*(pMsgIndex + 6) != 0) {
+                                        sscanf((const char*)(pMsgIndex + 6), 
+                                                         "%Lf[0123456789.]", &tmpData);
+                                        outDelay = (uint32_t)(tmpData * 100);
+                                    }
 
-                                        screenInfo.Config->po3 = outDelay;
-                                        SpiPackaged(Mask_PO3, screenInfo.Config->po3 * 2);
-                                        break;
-                                    case 0x04:                         /*  光输出4                       */
-                                        if (*(pMsgIndex + 6) != 0) {
-                                            sscanf((const char*)(pMsgIndex + 6), 
-                                                             "%Lf[0123456789.]", &tmpData);
-                                            outDelay = (uint32_t)(tmpData * 100);
-                                        }
+                                    screenInfo.Config->po4 = outDelay;
+                                    SpiPackaged(Mask_PO4, screenInfo.Config->po4 * 2);
+                                    break;
+                                case 0x05:                             /*  电输出1                       */
+                                    if (*(pMsgIndex + 6) != 0) {
+                                        sscanf((const char*)(pMsgIndex + 6), 
+                                                         "%Lf[0123456789.]", &tmpData);
+                                        outDelay = (uint32_t)(tmpData * 100);
+                                    }
 
-                                        screenInfo.Config->po4 = outDelay;
-                                        SpiPackaged(Mask_PO4, screenInfo.Config->po4 * 2);
-                                        break;
-                                    case 0x05:                         /*  电输出1                       */
-                                        if (*(pMsgIndex + 6) != 0) {
-                                            sscanf((const char*)(pMsgIndex + 6), 
-                                                             "%Lf[0123456789.]", &tmpData);
-                                            outDelay = (uint32_t)(tmpData * 100);
-                                        }
+                                    screenInfo.Config->eo1 = outDelay;
+                                    SpiPackaged(Mask_EO1, screenInfo.Config->eo1 * 2);
+                                    break;
+                                case 0x06:                             /*  电输出2                       */
+                                    if (*(pMsgIndex + 6) != 0) {
+                                        sscanf((const char*)(pMsgIndex + 6), 
+                                                         "%Lf[0123456789.]", &tmpData);
+                                        outDelay = (uint32_t)(tmpData * 100);
+                                    }
 
-                                        screenInfo.Config->eo1 = outDelay;
-                                        SpiPackaged(Mask_EO1, screenInfo.Config->eo1 * 2);
-                                        break;
-                                    case 0x06:                         /*  电输出2                       */
-                                        if (*(pMsgIndex + 6) != 0) {
-                                            sscanf((const char*)(pMsgIndex + 6), 
-                                                             "%Lf[0123456789.]", &tmpData);
-                                            outDelay = (uint32_t)(tmpData * 100);
-                                        }
+                                    screenInfo.Config->eo2 = outDelay;
+                                    SpiPackaged(Mask_EO2, screenInfo.Config->eo2 * 2);
+                                    break;
+                                case 0x07:                             /*  电输出3                       */
+                                    if (*(pMsgIndex + 6) != 0) {
+                                        sscanf((const char*)(pMsgIndex + 6), 
+                                                         "%Lf[0123456789.]", &tmpData);
+                                        outDelay = (uint32_t)(tmpData * 100);
+                                    }
 
-                                        screenInfo.Config->eo2 = outDelay;
-                                        SpiPackaged(Mask_EO2, screenInfo.Config->eo2 * 2);
-                                        break;
-                                    case 0x07:                         /*  电输出3                       */
-                                        if (*(pMsgIndex + 6) != 0) {
-                                            sscanf((const char*)(pMsgIndex + 6), 
-                                                             "%Lf[0123456789.]", &tmpData);
-                                            outDelay = (uint32_t)(tmpData * 100);
-                                        }
+                                    screenInfo.Config->eo3 = outDelay;
+                                    SpiPackaged(Mask_EO3, screenInfo.Config->eo3 * 2);
+                                    break;
+                                case 0x08:                             /*  电输出4                       */
+                                    if (*(pMsgIndex + 6) != 0) {
+                                        sscanf((const char*)(pMsgIndex + 6), 
+                                                         "%Lf[0123456789.]", &tmpData);
+                                        outDelay = (uint32_t)(tmpData * 100);
+                                    }
 
-                                        screenInfo.Config->eo3 = outDelay;
-                                        SpiPackaged(Mask_EO3, screenInfo.Config->eo3 * 2);
-                                        break;
-                                    case 0x08:                         /*  电输出4                       */
-                                        if (*(pMsgIndex + 6) != 0) {
-                                            sscanf((const char*)(pMsgIndex + 6), 
-                                                             "%Lf[0123456789.]", &tmpData);
-                                            outDelay = (uint32_t)(tmpData * 100);
-                                        }
+                                    screenInfo.Config->eo4 = outDelay;
+                                    SpiPackaged(Mask_EO4, screenInfo.Config->eo4 * 2);
+                                    break;
+                                case 0x09:                             /*  电输出5                       */
+                                    if (*(pMsgIndex + 6) != 0) {
+                                        sscanf((const char*)(pMsgIndex + 6), 
+                                                         "%Lf[0123456789.]", &tmpData);
+                                        outDelay = (uint32_t)(tmpData * 100);
+                                    }
 
-                                        screenInfo.Config->eo4 = outDelay;
-                                        SpiPackaged(Mask_EO4, screenInfo.Config->eo4 * 2);
-                                        break;
-                                    case 0x09:                         /*  电输出5                       */
-                                        if (*(pMsgIndex + 6) != 0) {
-                                            sscanf((const char*)(pMsgIndex + 6), 
-                                                             "%Lf[0123456789.]", &tmpData);
-                                            outDelay = (uint32_t)(tmpData * 100);
-                                        }
+                                    screenInfo.Config->eo5 = outDelay;
+                                    SpiPackaged(Mask_EO5, screenInfo.Config->eo5 * 2);
+                                    break;
+                                case 0x0A:                             /*  电输出6                       */
+                                    if (*(pMsgIndex + 6) != 0) {
+                                        sscanf((const char*)(pMsgIndex + 6), 
+                                                         "%Lf[0123456789.]", &tmpData);
+                                        outDelay = (uint32_t)(tmpData * 100);
+                                    }
 
-                                        screenInfo.Config->eo5 = outDelay;
-                                        SpiPackaged(Mask_EO5, screenInfo.Config->eo5 * 2);
-                                        break;
-                                    case 0x0A:                         /*  电输出6                       */
-                                        if (*(pMsgIndex + 6) != 0) {
-                                            sscanf((const char*)(pMsgIndex + 6), 
-                                                             "%Lf[0123456789.]", &tmpData);
-                                            outDelay = (uint32_t)(tmpData * 100);
-                                        }
+                                    screenInfo.Config->eo6 = outDelay;
+                                    SpiPackaged(Mask_EO6, screenInfo.Config->eo6 * 2);
+                                    break;
+                                case 0x0B:                             /*  电输出7                       */
+                                    if (*(pMsgIndex + 6) != 0) {
+                                        sscanf((const char*)(pMsgIndex + 6), 
+                                                         "%Lf[0123456789.]", &tmpData);
+                                        outDelay = (uint32_t)(tmpData * 100);
+                                    }
 
-                                        screenInfo.Config->eo6 = outDelay;
-                                        SpiPackaged(Mask_EO6, screenInfo.Config->eo6 * 2);
-                                        break;
-                                    case 0x0B:                         /*  电输出7                       */
-                                        if (*(pMsgIndex + 6) != 0) {
-                                            sscanf((const char*)(pMsgIndex + 6), 
-                                                             "%Lf[0123456789.]", &tmpData);
-                                            outDelay = (uint32_t)(tmpData * 100);
-                                        }
+                                    screenInfo.Config->eo7 = outDelay;
+                                    SpiPackaged(Mask_EO7, screenInfo.Config->eo7 * 2);
+                                    break;
+                                case 0x0C:                             /*  电输出8                       */
+                                    if (*(pMsgIndex + 6) != 0) {
+                                        sscanf((const char*)(pMsgIndex + 6), 
+                                                         "%Lf[0123456789.]", &tmpData);
+                                        outDelay = (uint32_t)(tmpData * 100);
+                                    }
 
-                                        screenInfo.Config->eo7 = outDelay;
-                                        SpiPackaged(Mask_EO7, screenInfo.Config->eo7 * 2);
-                                        break;
-                                    case 0x0C:                         /*  电输出8                       */
-                                        if (*(pMsgIndex + 6) != 0) {
-                                            sscanf((const char*)(pMsgIndex + 6), 
-                                                             "%Lf[0123456789.]", &tmpData);
-                                            outDelay = (uint32_t)(tmpData * 100);
-                                        }
+                                    screenInfo.Config->eo8 = outDelay;
+                                    SpiPackaged(Mask_EO8, screenInfo.Config->eo8 * 2);
+                                    break;
+                                default:
+                                    break;
+                            }
+                            pMsgIndex += 7;
+                            break;
+                            
+                        case TESTING:                                  /*  测试界面                      */
+                            if (*(pMsgIndex + 4) == 0x04) {            /*  定时触发值                    */
+                                if (*(pMsgIndex + 6) != 0) {
+                                        sscanf((const char*)(pMsgIndex + 6), 
+                                                         "%Lf[0123456789.]", &tmpData);
+                                        triDelay = (uint32_t)(tmpData * 100);
+                                    }
 
-                                        screenInfo.Config->eo8 = outDelay;
-                                        SpiPackaged(Mask_EO8, screenInfo.Config->eo8 * 2);
-                                        break;
-                                    default:
-                                        break;
-                                }
+                                screenInfo.Config->triDelay = triDelay;
+                                SpiPackaged(Mask_triDelay, screenInfo.Config->triDelay * 2);
+                                FlashOperate(FlashOp_ConfigSave);
                                 pMsgIndex += 7;
                                 break;
-                                
-                            case TESTING:                              /*  测试界面                      */
-                                if (*(pMsgIndex + 4) == 0x04) {        /*  定时触发值                    */
-                                    if (*(pMsgIndex + 6) != 0) {
-                                            sscanf((const char*)(pMsgIndex + 6), 
-                                                             "%Lf[0123456789.]", &tmpData);
-                                            triDelay = (uint32_t)(tmpData * 100);
-                                        }
-
-                                    screenInfo.Config->triDelay = triDelay;
-                                    SpiPackaged(Mask_triDelay, screenInfo.Config->triDelay * 2);
-                                    FlashOperate(FlashOp_ConfigSave);
-                                    pMsgIndex += 7;
-                                    break;
-                                }
-                                
-                                switch (*(pMsgIndex + 4)) {
-                                    
-                                    case 0x06:                         /*  启动定时触发                  */
-                                        NotifyFPGA(Mode_DelayGo);
-                                        break;
-
-                                    case 0x07:                         /*  刹车按键                      */
-                                        if (*(pMsgIndex + 7)) {        /*  使能刹车                      */
-                                            NotifyFPGA(Mode_Stop);
-                                        } else {
-                                            NotifyFPGA(Mode_Run);
-                                        }
-                                        break;
-                                    
-                                    case 0x08:                         /*  返回按键                      */
-                                        FlashOperate(FlashOp_ConfigSave);
-                                        NotifyFPGA(Mode_Stop);
-                                        break;
-                                    
-                                    case 0x09:                         /*  定时、同步模式转换            */
-                                        if (*(pMsgIndex + 7)) {        /*  按下 同步模式                 */
-                                            NotifyFPGA(Mode_SyncTri);
-                                        } else {
-                                            NotifyFPGA(Mode_DelayTri);
-                                        }
-                                        break;
-                                    
-                                    case 0x0A:                         /*  查看记录                      */
-                                        break;
-                                    
-                                    default:
-                                        break;
-                                }
-                                pMsgIndex += 8;
-                                break;
+                            }
                             
-                            case RECORD:                               /*  数据记录界面                  */
-                                if (*(pMsgIndex + 4) == 0x03) {        /*  删除记录键按下                */
-                                    listRemoveAll(screenInfo.TriList);
-                                    FlashOperate(FlashOp_TimestampEraser);
-                                } else if (*(pMsgIndex + 4) == 0x02) {
-                                                                       /*  返回键按下                    */
-                                }
-                                pMsgIndex += 8;
-                                break;
-                        }
-                        break;
-                    
-                    default:
-                        break;
-                }
-            }
+                            switch (*(pMsgIndex + 4)) {
+                                
+                                case 0x06:                             /*  启动定时触发                  */
+                                    NotifyFPGA(Mode_DelayGo);
+                                    break;
 
-            while (*pMsgIndex == 0xFF || *pMsgIndex == 0xFC) {
-                pMsgIndex++;
+                                case 0x07:                             /*  刹车按键                      */
+                                    if (*(pMsgIndex + 7)) {            /*  使能刹车                      */
+                                        NotifyFPGA(Mode_Stop);
+                                    } else {
+                                        NotifyFPGA(Mode_Run);
+                                    }
+                                    break;
+                                
+                                case 0x08:                             /*  返回按键                      */
+                                    FlashOperate(FlashOp_ConfigSave);
+                                    NotifyFPGA(Mode_Stop);
+                                    break;
+                                
+                                case 0x09:                             /*  定时、同步模式转换            */
+                                    if (*(pMsgIndex + 7)) {            /*  按下 同步模式                 */
+                                        NotifyFPGA(Mode_SyncTri);
+                                    } else {
+                                        NotifyFPGA(Mode_DelayTri);
+                                    }
+                                    break;
+                                
+                                case 0x0A:                             /*  查看记录                      */
+                                    break;
+                                
+                                default:
+                                    break;
+                            }
+                            pMsgIndex += 8;
+                            break;
+                        
+                        case RECORD:                                   /*  数据记录界面                  */
+                            if (*(pMsgIndex + 4) == 0x03) {            /*  删除记录键按下                */
+                                listRemoveAll(screenInfo.TriList);
+                                FlashOperate(FlashOp_TimestampEraser);
+                            } else if (*(pMsgIndex + 4) == 0x02) {
+                                                                       /*  返回键按下                    */
+                            }
+                            pMsgIndex += 8;
+                            break;
+                    }
+                    break;
+                
+                default:
+                    break;
             }
         }
-        
-        memFree(&ScreenRxMem, (void*)tmpRxNode);                       /*  释放当前节点                  */
+
+        while (*pMsgIndex == 0xFF || *pMsgIndex == 0xFC) {
+            pMsgIndex++;
+        }
     }
+        
+    memFree(&ScreenRxMem, (void*)tmpRxNode);                           /*  释放当前节点                  */
 }
 
 /*
