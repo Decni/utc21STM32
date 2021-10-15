@@ -530,7 +530,7 @@ static void ShellCallback_GetRecord(char* arg) {
         tmpUs      = (tmpTime % 100000) / 100;
         tmpNs      = tmpTime % 100;
         
-        tmpIndex   = sprintf(tmpBuff, "\t   %2u       \033[34;1m", i + 1);
+        tmpIndex   = sprintf(tmpBuff, "   %2u       \033[34;1m", i + 1);
         
         if (tmpTriNode->time.item.num > 3) {
             tmpBuff[tmpIndex++]   = 'P';
@@ -547,7 +547,8 @@ static void ShellCallback_GetRecord(char* arg) {
         tmpBuff[tmpIndex++]   = 'I';
         tmpIndex++;
         
-        tmpIndex += sprintf(tmpBuff, "\033[0m     %.4u-%.2u-%.2u %.2u:%.2u:%.2u.%.3u.%.3u.%.2u"endl,
+        tmpIndex += sprintf((char*)&(tmpBuff[tmpIndex]), 
+                                    "\033[0m     %.4u-%.2u-%.2u %.2u:%.2u:%.2u.%.3u.%.3u.%.2u"endl,
                                     tmpDate->tm_year + 1900, tmpDate->tm_mon + 1, tmpDate->tm_mday,
                                     tmpDate->tm_hour, tmpDate->tm_min, tmpDate->tm_sec,
                                     tmpMs, tmpUs, tmpNs);

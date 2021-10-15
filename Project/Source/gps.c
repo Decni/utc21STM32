@@ -9,7 +9,7 @@
 
 tGpsReceve  GpsReceveA, GpsReceveB;
 tGpsReceve *pGpsReceve, *pGpsProcess;
-bool        timeFPGA = false;                                          /*  判断是否配置 FPGA 秒时间      */
+bool        FPGA_TimeCfgFlag = false;                                  /*  判断是否配置 FPGA 秒时间      */
 extern bool FPGA_ResetFlag;
 
 static void DMA_Config_GPS(void);
@@ -172,28 +172,23 @@ void GpsProcess (void) {
 					time.tm_mon  = 0;
 					time.tm_year = 0;
                 }
-                
-                if (!timeFPGA 
-                    && FPGA_ResetFlag
-                    && GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_6)) {     /*  PPS LOCK VAILD                */
-                        
-                    tmpPos = GetComma(token, 2);
-                    if (token[tmpPos] == 'A') {                        /*  pps 数据有效                  */
-                        t_time = mktime(&time) + 28800;                /*  东 8 区    8 * 60 * 60        */
-                                
+   
+                tmpPos = GetComma(token, 2);
+                if (token[tmpPos] == 'A') {                            /*  pps 数据有效                  */
+                    t_time = mktime(&time) + 28800;                    /*  东 8 区  + 8 * 60 * 60        */
+
+                    if (!FPGA_TimeCfgFlag                              /*  FPGA 时间配置标志             */
+                        && FPGA_ResetFlag                              /*  FPGA 复位标志                 */
+                        && GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_6)) { /*  PPS LOCK VAILD                */
+                            
                         SpiPackaged(Mask_GPS, t_time);
-                        timeFPGA = true;
+                        FPGA_TimeCfgFlag = true;
                         screenMsg.wRtc(&t_time);
 #ifdef DEBUG
                         ShellPakaged(Red(CONFIG)" FPGA GPS Time To %#lx"endl, t_time);
                         ShellPakaged("Now: %s"endl, asctime(localtime(&t_time)));
 #endif
-                    } else {
-                        screenMsg.rRtc(0);
-#ifdef DEBUG
-                        ShellPakaged(Red(WORNING)": GPS is Invalid!"endl);
-#endif
-                    }
+                    } 
                 }
             }
             

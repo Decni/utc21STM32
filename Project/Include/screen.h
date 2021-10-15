@@ -11,7 +11,7 @@
 #define SCREEN_RX_MAX_ITEM    4
  
 #define TX_WAITING_TIME       1000                                     /*  u16 两条指令间隔 100ms        */
-#define POWER_WAITING_TIME    500                                      /*  u16 50ms                      */
+#define POWER_WAITING_TIME    1000                                     /*  u16 100ms                     */
 #define POWER_RESET_TIME      10000                                    /*  u16 1s                        */
 
 typedef struct _screenTxNode {

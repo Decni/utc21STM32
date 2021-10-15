@@ -1692,6 +1692,7 @@ void ScreenProcess(void) {
                 pMsgIndex++;
                 if (*((uint32_t*)pMsgIndex) == 0xFFFFFCFF) {           /*  Ð£Ñé°üÎ²                      */
                     screenInfo.Power = true;
+                    screenMsg.rRtc(0);
                     screenMsg.wSetBatch(0);
                     screenMsg.wTriDelay(0);
                     screenMsg.wTriRecord(0);
