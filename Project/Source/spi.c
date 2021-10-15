@@ -62,15 +62,15 @@ static void ShellCallback_ResetFPGA (char *arg);
 */
  void ComInit_SPI(void)
 {
-	GPIO_InitTypeDef GPIO_InitStructure;
-	SPI_InitTypeDef  SPI_InitStructure;
+    GPIO_InitTypeDef GPIO_InitStructure;
+    SPI_InitTypeDef  SPI_InitStructure;
 //    NVIC_InitTypeDef NVIC_InitStruct;
     
     
     listInit(&SpiTxList);                                              /*  初始化发送和接收链表          */
-	listInit(&SpiRxList);
+    listInit(&SpiRxList);
     memInit(&SpiTxMem,SpiTxBuff, sizeof(tSpiTxNode), SPI_TX_MAX_ITEM, "SpiTxMem");
-	memInit(&SpiRxMem,SpiRxBuff, sizeof(tSpiRxNode), SPI_RX_MAX_ITEM, "SpiRxMem");
+    memInit(&SpiRxMem,SpiRxBuff, sizeof(tSpiRxNode), SPI_RX_MAX_ITEM, "SpiRxMem");
                                                                        /*  初始化发送和接受内存块        */
     TriList  = &SpiRxList;
     TriMem   = &SpiRxMem;
@@ -78,35 +78,35 @@ static void ShellCallback_ResetFPGA (char *arg);
 #if ExTri_Level_Edge
     fReady   = 0;
 #endif   
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB | RCC_APB2Periph_AFIO,ENABLE);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB | RCC_APB2Periph_AFIO,ENABLE);
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_SPI2, ENABLE);
 
     GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_12;
-	GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_Init(GPIOB, &GPIO_InitStructure);                             /*  NSS                           */
+    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init(GPIOB, &GPIO_InitStructure);                             /*  NSS                           */
     GPIO_SetBits(GPIOB,GPIO_Pin_12);
     
     GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_13 | GPIO_Pin_15;         /*  CLK MOSI                      */
-	GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_Init(GPIOB, &GPIO_InitStructure);
+    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init(GPIOB, &GPIO_InitStructure);
     
-	GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_14;                       /*  MISO                          */
-	GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_IPU;
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_Init(GPIOB, &GPIO_InitStructure);                             /*  初始化CLK MOSI MISO NSS管脚   */
+    GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_14;                       /*  MISO                          */
+    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_IPU;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init(GPIOB, &GPIO_InitStructure);                             /*  初始化CLK MOSI MISO NSS管脚   */
 	
-	SPI_InitStructure.SPI_Direction         = SPI_Direction_2Lines_FullDuplex;
-	SPI_InitStructure.SPI_Mode              = SPI_Mode_Master;
-	SPI_InitStructure.SPI_DataSize          = SPI_DataSize_8b; 
-	SPI_InitStructure.SPI_CPOL              = SPI_CPOL_High; 
-	SPI_InitStructure.SPI_CPHA              = SPI_CPHA_2Edge;
-	SPI_InitStructure.SPI_NSS               = SPI_NSS_Soft;
-	SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_2;
-	SPI_InitStructure.SPI_FirstBit          = SPI_FirstBit_LSB;
-	SPI_InitStructure.SPI_CRCPolynomial     = 7;
-	SPI_Init(SPI2, &SPI_InitStructure);                                /*  SPI基本配置                   */
+    SPI_InitStructure.SPI_Direction         = SPI_Direction_2Lines_FullDuplex;
+    SPI_InitStructure.SPI_Mode              = SPI_Mode_Master;
+    SPI_InitStructure.SPI_DataSize          = SPI_DataSize_8b; 
+    SPI_InitStructure.SPI_CPOL              = SPI_CPOL_High; 
+    SPI_InitStructure.SPI_CPHA              = SPI_CPHA_2Edge;
+    SPI_InitStructure.SPI_NSS               = SPI_NSS_Soft;
+    SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_2;
+    SPI_InitStructure.SPI_FirstBit          = SPI_FirstBit_LSB;
+    SPI_InitStructure.SPI_CRCPolynomial     = 7;
+    SPI_Init(SPI2, &SPI_InitStructure);                                /*  SPI基本配置                   */
     SPI_SSOutputCmd(SPI2, DISABLE);                                    /*  禁止NSS输出                   */
     
     DMA_Config_SPI();                                                  /*  SPI收发DMA配置                */
@@ -122,60 +122,60 @@ static void ShellCallback_ResetFPGA (char *arg);
     DMA配置函数
 */
 static void DMA_Config_SPI (void) {
-	DMA_InitTypeDef DMA_InitStruct;
+    DMA_InitTypeDef DMA_InitStruct;
     NVIC_InitTypeDef NVIC_InitStruct;
-	
-	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1,ENABLE);
-
-	DMA_Cmd(DMA1_Channel4,DISABLE);                                    /*  接收DMA配置                   */
-	DMA_DeInit(DMA1_Channel4);	
-	DMA_InitStruct.DMA_PeripheralBaseAddr = (uint32_t)(&(SPI2->DR));
-	DMA_InitStruct.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;
-	DMA_InitStruct.DMA_PeripheralInc      = DMA_PeripheralInc_Disable;
-	DMA_InitStruct.DMA_MemoryBaseAddr     = (uint32_t)0;
-	DMA_InitStruct.DMA_MemoryDataSize     = DMA_PeripheralDataSize_Byte;
-	DMA_InitStruct.DMA_MemoryInc          = DMA_MemoryInc_Enable;
-	DMA_InitStruct.DMA_DIR                = DMA_DIR_PeripheralSRC;
-	DMA_InitStruct.DMA_BufferSize         = 0;
-	DMA_InitStruct.DMA_Priority           = DMA_Priority_VeryHigh;
-	DMA_InitStruct.DMA_Mode               = DMA_Mode_Normal;
+    
+    RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1,ENABLE);
+    
+    DMA_Cmd(DMA1_Channel4,DISABLE);                                    /*  接收DMA配置                   */
+    DMA_DeInit(DMA1_Channel4);	
+    DMA_InitStruct.DMA_PeripheralBaseAddr = (uint32_t)(&(SPI2->DR));
+    DMA_InitStruct.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;
+    DMA_InitStruct.DMA_PeripheralInc      = DMA_PeripheralInc_Disable;
+    DMA_InitStruct.DMA_MemoryBaseAddr     = (uint32_t)0;
+    DMA_InitStruct.DMA_MemoryDataSize     = DMA_PeripheralDataSize_Byte;
+    DMA_InitStruct.DMA_MemoryInc          = DMA_MemoryInc_Enable;
+    DMA_InitStruct.DMA_DIR                = DMA_DIR_PeripheralSRC;
+    DMA_InitStruct.DMA_BufferSize         = 0;
+    DMA_InitStruct.DMA_Priority           = DMA_Priority_VeryHigh;
+    DMA_InitStruct.DMA_Mode               = DMA_Mode_Normal;
     DMA_InitStruct.DMA_M2M                = DMA_M2M_Disable;
-	DMA_Init(DMA1_Channel4,&DMA_InitStruct);
-	DMA_ClearFlag(DMA1_FLAG_GL4);
+    DMA_Init(DMA1_Channel4,&DMA_InitStruct);
+    DMA_ClearFlag(DMA1_FLAG_GL4);
     DMA_ITConfig(DMA1_Channel4, DMA_IT_TC, ENABLE);
     DMA_ITConfig(DMA1_Channel4, DMA_IT_TE, DISABLE);
     DMA_ITConfig(DMA1_Channel4, DMA_IT_HT, DISABLE);
     
     NVIC_InitStruct.NVIC_IRQChannel                   = DMA1_Channel4_IRQn;
-	NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority = 1;
-	NVIC_InitStruct.NVIC_IRQChannelSubPriority        = 0;
-	NVIC_InitStruct.NVIC_IRQChannelCmd                = ENABLE;
-	NVIC_Init(&NVIC_InitStruct);
+    NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority = 1;
+    NVIC_InitStruct.NVIC_IRQChannelSubPriority        = 0;
+    NVIC_InitStruct.NVIC_IRQChannelCmd                = ENABLE;
+    NVIC_Init(&NVIC_InitStruct);
     
     DMA_Cmd(DMA1_Channel5,DISABLE);                                    /*  发送DMA配置                   */
-	DMA_DeInit(DMA1_Channel5);	
-	DMA_InitStruct.DMA_PeripheralBaseAddr = (uint32_t)(&(SPI2->DR));
-	DMA_InitStruct.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;
-	DMA_InitStruct.DMA_PeripheralInc      = DMA_PeripheralInc_Disable;
-	DMA_InitStruct.DMA_MemoryBaseAddr     = (uint32_t)0;
-	DMA_InitStruct.DMA_MemoryDataSize     = DMA_PeripheralDataSize_Byte;
-	DMA_InitStruct.DMA_MemoryInc          = DMA_MemoryInc_Enable;
-	DMA_InitStruct.DMA_DIR                = DMA_DIR_PeripheralDST;
-	DMA_InitStruct.DMA_BufferSize         = 0;
-	DMA_InitStruct.DMA_Priority           = DMA_Priority_High;
-	DMA_InitStruct.DMA_Mode               = DMA_Mode_Normal;
+    DMA_DeInit(DMA1_Channel5);	
+    DMA_InitStruct.DMA_PeripheralBaseAddr = (uint32_t)(&(SPI2->DR));
+    DMA_InitStruct.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;
+    DMA_InitStruct.DMA_PeripheralInc      = DMA_PeripheralInc_Disable;
+    DMA_InitStruct.DMA_MemoryBaseAddr     = (uint32_t)0;
+    DMA_InitStruct.DMA_MemoryDataSize     = DMA_PeripheralDataSize_Byte;
+    DMA_InitStruct.DMA_MemoryInc          = DMA_MemoryInc_Enable;
+    DMA_InitStruct.DMA_DIR                = DMA_DIR_PeripheralDST;
+    DMA_InitStruct.DMA_BufferSize         = 0;
+    DMA_InitStruct.DMA_Priority           = DMA_Priority_High;
+    DMA_InitStruct.DMA_Mode               = DMA_Mode_Normal;
     DMA_InitStruct.DMA_M2M                = DMA_M2M_Disable;
-	DMA_Init(DMA1_Channel5,&DMA_InitStruct);
+    DMA_Init(DMA1_Channel5,&DMA_InitStruct);
     DMA_ClearFlag(DMA1_FLAG_GL5);
     DMA_ITConfig(DMA1_Channel5,DMA_IT_TE,DISABLE);
     DMA_ITConfig(DMA1_Channel5,DMA_IT_HT,DISABLE);
-	DMA_ITConfig(DMA1_Channel5,DMA_IT_TC,ENABLE);
-    	
+    DMA_ITConfig(DMA1_Channel5,DMA_IT_TC,ENABLE);
+        
     NVIC_InitStruct.NVIC_IRQChannel                   = DMA1_Channel5_IRQn;
-	NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority = 1;
-	NVIC_InitStruct.NVIC_IRQChannelSubPriority        = 0;
-	NVIC_InitStruct.NVIC_IRQChannelCmd                = ENABLE;
-	NVIC_Init(&NVIC_InitStruct);
+    NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority = 1;
+    NVIC_InitStruct.NVIC_IRQChannelSubPriority        = 0;
+    NVIC_InitStruct.NVIC_IRQChannelCmd                = ENABLE;
+    NVIC_Init(&NVIC_InitStruct);
 }
 
 /*
