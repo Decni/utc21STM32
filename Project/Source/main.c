@@ -20,7 +20,6 @@ int main (void) {
     FlashOperate(FlashOp_ConfigRead);
     FlashOperate(FlashOp_TimestampRead);
     
-    
     ShellSplash();
     while (1) {
         SpiReceve();

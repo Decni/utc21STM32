@@ -1983,7 +1983,7 @@ void ScreenProcess(void) {
                         
                         case RECORD:                                   /*  数据记录界面                  */
                             if (*(pMsgIndex + 4) == 0x03) {            /*  删除记录键按下                */
-                                listRemoveAll(screenInfo.TriList);
+                                memFreeList(TriMem, screenInfo.TriList);
                                 FlashOperate(FlashOp_TimestampEraser);
                             } else if (*(pMsgIndex + 4) == 0x02) {
                                                                        /*  返回键按下                    */

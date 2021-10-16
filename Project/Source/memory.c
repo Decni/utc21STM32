@@ -94,6 +94,26 @@ void memFree(tMemory *mem, void* bStart) {
     listAddLast(&(mem->blockList), (tNode*)bStart);
 }
 
+/*  
+    删除并释放整个链表
+*/
+void memFreeList (tMemory *mem, tList *list) {
+    tNode *pNode;
+    
+    if ((mem == (tMemory*)0) || (list == (tList*)0) || (list->listCount == 0)) {
+        return;
+    }
+    
+    pNode = listRemoveFirst(list);
+    
+    while (pNode != (tNode*)0) {
+        nodeInit(pNode);
+        listAddLast(&(mem->blockList), pNode);
+        pNode = listRemoveFirst(list);
+    }
+    
+}
+
 /*
     获取内存块信息
 */

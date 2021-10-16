@@ -103,11 +103,12 @@ static void ShellCallback_ResetFPGA (char *arg);
     SPI_InitStructure.SPI_CPOL              = SPI_CPOL_High; 
     SPI_InitStructure.SPI_CPHA              = SPI_CPHA_2Edge;
     SPI_InitStructure.SPI_NSS               = SPI_NSS_Soft;
-    SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_2;
+    SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_128;
     SPI_InitStructure.SPI_FirstBit          = SPI_FirstBit_LSB;
     SPI_InitStructure.SPI_CRCPolynomial     = 7;
     SPI_Init(SPI2, &SPI_InitStructure);                                /*  SPI基本配置                   */
     SPI_SSOutputCmd(SPI2, DISABLE);                                    /*  禁止NSS输出                   */
+    SPI2->CR1 &= ~(uint16_t)(1 << 10);                                 /*  清除RxOnly位                  */
     
     DMA_Config_SPI();                                                  /*  SPI收发DMA配置                */
     SpecialPinInit();                                                  /*  专用管脚初始化                */
@@ -142,7 +143,7 @@ static void DMA_Config_SPI (void) {
     DMA_InitStruct.DMA_M2M                = DMA_M2M_Disable;
     DMA_Init(DMA1_Channel4,&DMA_InitStruct);
     DMA_ClearFlag(DMA1_FLAG_GL4);
-    DMA_ITConfig(DMA1_Channel4, DMA_IT_TC, ENABLE);
+    DMA_ITConfig(DMA1_Channel4, DMA_IT_TC, DISABLE);
     DMA_ITConfig(DMA1_Channel4, DMA_IT_TE, DISABLE);
     DMA_ITConfig(DMA1_Channel4, DMA_IT_HT, DISABLE);
     
@@ -169,7 +170,7 @@ static void DMA_Config_SPI (void) {
     DMA_ClearFlag(DMA1_FLAG_GL5);
     DMA_ITConfig(DMA1_Channel5,DMA_IT_TE,DISABLE);
     DMA_ITConfig(DMA1_Channel5,DMA_IT_HT,DISABLE);
-    DMA_ITConfig(DMA1_Channel5,DMA_IT_TC,ENABLE);
+    DMA_ITConfig(DMA1_Channel5,DMA_IT_TC,DISABLE);
         
     NVIC_InitStruct.NVIC_IRQChannel                   = DMA1_Channel5_IRQn;
     NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority = 1;
@@ -183,23 +184,37 @@ static void DMA_Config_SPI (void) {
 */
 static void ConfigSPI_Tx(void) {
     NotifyFPGA(Mode_Transmit);
-    SPI2->CR1 &= ~(uint16_t)(1 << 10);                                 /*  清除RxOnly位                  */
-    
+
+    DMA_ClearFlag(DMA1_FLAG_GL5);
+    DMA_SetCurrDataCounter(DMA1_Channel5, SPI_TX_MAX_BYTE);
+    DMA1_Channel5->CCR |= DMA_MemoryInc_Enable;
     SPI_I2S_DMACmd(SPI2, SPI_I2S_DMAReq_Tx, ENABLE);
-    DMA_Cmd(DMA1_Channel5,ENABLE);
+    DMA_ITConfig(DMA1_Channel5,DMA_IT_TC,ENABLE);
     SPI_Cmd(SPI2, ENABLE);
+    DMA_Cmd(DMA1_Channel5,ENABLE);
 }
 
 /*
     配置SPI为输入模式
 */
-static void ConfigSPI_Rx(void) {  
+static void ConfigSPI_Rx(void) {
+    static uint8_t tVar = 0;
     NotifyFPGA(Mode_Receve);
-    SPI2->CR1 |= (uint16_t)(1 << 10);                                  /*  置位RxOnly位                  */
 
-    SPI_I2S_DMACmd(SPI2, SPI_I2S_DMAReq_Rx, ENABLE);    
+    DMA_ClearFlag(DMA1_FLAG_GL4);
+    DMA_SetCurrDataCounter(DMA1_Channel4, SPI_RX_MAX_BYTE);
+    SPI_I2S_DMACmd(SPI2, SPI_I2S_DMAReq_Rx, ENABLE);
+    DMA_ITConfig(DMA1_Channel4,DMA_IT_TC,ENABLE);    
     DMA_Cmd(DMA1_Channel4,ENABLE);
+    
+    DMA_ClearFlag(DMA1_FLAG_GL5);
+    DMA_SetCurrDataCounter(DMA1_Channel5, SPI_RX_MAX_BYTE);
+    DMA1_Channel5->CMAR = (uint32_t)&tVar;
+    DMA1_Channel5->CCR &= ~DMA_MemoryInc_Enable;
+    SPI_I2S_DMACmd(SPI2, SPI_I2S_DMAReq_Tx, ENABLE);
+
     SPI_Cmd(SPI2, ENABLE);
+    DMA_Cmd(DMA1_Channel5,ENABLE);
 }
 
 /*
@@ -216,7 +231,7 @@ void SpiReceve (void) {
         && GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_3)
         && screenInfo.TriMode == Mode_SyncTri) {
 #endif
-    tNode *pNode;
+        tNode *pNode;
         if (listGetCount(&SpiRxList) >= SPI_RX_MAX_ITEM) {
             pNode = listRemoveLast(&SpiRxList);
             if (pNode != (tNode*)0) {
@@ -230,14 +245,11 @@ void SpiReceve (void) {
         while (SPI2->SR & 0x41) {
             tSPIDR += SPI2->DR;                                        /*  清空RXNE OVR 标志位           */
         }
-        DMA_ClearFlag(DMA1_FLAG_GL4);
-        
-        DMA_SetCurrDataCounter(DMA1_Channel4, SPI_RX_MAX_BYTE);
+
         DMA1_Channel4->CMAR = (uint32_t)&(pSpiRxNode->buff);
         SpiState = SPI_RECEVE;
         ConfigSPI_Rx();                                                /*  配置并启动SPI接收             */
     } else if (SpiState == SPI_RECEVE_DONE) {
-        SPI2->CR1 &= ~(uint16_t)(1 << 10);                             /*  清除RxOnly位                  */
         NotifyFPGA(Mode_Transmit);
         listAddFirst(&SpiRxList, &(pSpiRxNode->node));
 #ifdef DEBUG
@@ -260,14 +272,13 @@ void SpiTransmit (void) {
     if (FPGA_ResetFlag && (SpiState == SPI_IDLE) && (listGetCount(&SpiTxList) > 0)) {
         pSpiTxNode = getNodeParent(tSpiTxNode, node, listRemoveFirst(&SpiTxList));
         
-        DMA_ClearFlag(DMA1_FLAG_GL5);
-        DMA_SetCurrDataCounter(DMA1_Channel5, SPI_TX_MAX_BYTE);
         DMA1_Channel5->CMAR = (uint32_t)&(pSpiTxNode->buff);           /*  更新spi DMA发送               */
         SpiState = SPI_TRANSMIT;
         ConfigSPI_Tx();                                                /*  配置并启动SPI发送             */
     } else if (SpiState == SPI_WAIT_FREE) {
         
         if (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_BSY) == RESET) {  /*  busy标志已经复位              */
+            SPI_Cmd(SPI2, DISABLE);
             SpiState = SPI_IDLE;
         }            
     }
@@ -299,7 +310,7 @@ void SpiPackaged (tMsgMask mask, uint32_t value) {
 }
 
 /*
-    dma发送完成中断
+    dma接收完成中断
 */
 void DMA1_Channel4_IRQHandler(void)
 {
@@ -309,15 +320,18 @@ void DMA1_Channel4_IRQHandler(void)
         
         SPI_Cmd(SPI2, DISABLE);
         if( SpiState == SPI_RECEVE) {
+            DMA_Cmd(DMA1_Channel5,DISABLE);
             DMA_Cmd(DMA1_Channel4,DISABLE);
             SPI_I2S_DMACmd(SPI2, SPI_I2S_DMAReq_Rx, DISABLE);
+            SPI_I2S_DMACmd(SPI2, SPI_I2S_DMAReq_Tx, DISABLE);
+            DMA_ITConfig(DMA1_Channel4, DMA_IT_TC, DISABLE);
             SpiState = SPI_RECEVE_DONE;
         }
     }
 }
 
 /*
-    dma接收完成中断
+    dma发送完成中断
 */
 void DMA1_Channel5_IRQHandler(void)
 {
@@ -325,10 +339,10 @@ void DMA1_Channel5_IRQHandler(void)
     {
         DMA_ClearITPendingBit(DMA1_IT_GL5);                            /*  清除全部中断标志              */
         
-        SPI_Cmd(SPI2, DISABLE);
         if (SpiState == SPI_TRANSMIT) {
             DMA_Cmd(DMA1_Channel5,DISABLE);
             SPI_I2S_DMACmd(SPI2, SPI_I2S_DMAReq_Tx, DISABLE);
+            DMA_ITConfig(DMA1_Channel5, DMA_IT_TC, DISABLE);
             memFree(&SpiTxMem, (void*)pSpiTxNode);                     /*  释放当前发送节点              */
             pSpiTxNode = (tSpiTxNode*)0;
             SpiState = SPI_WAIT_FREE;
