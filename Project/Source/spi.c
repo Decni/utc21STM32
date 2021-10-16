@@ -34,9 +34,6 @@ const char *ResetFpgaHelp = "        "Blue(rf)": reset fpga."endl
                             "        [ ] Reset FPGA."endl
                             "       [-h] Show rf help."endl;
 
-#if ExTri_Level_Edge
-volatile uint32_t fReady;                                              /*  触发后 FPGA 通知 STM32        */
-#endif
 tList   SpiTxList, SpiRxList;                                          /*  spi收发数据链表               */
 tMemory SpiTxMem, SpiRxMem;                                            /*  spi收发内存块                 */
 uint8_t SpiTxBuff[sizeof(tSpiTxNode) * SPI_TX_MAX_ITEM];
@@ -46,9 +43,8 @@ tSpiRxNode *pSpiRxNode;
 tSpiTxNode *pSpiTxNode;                                                /*  spi收发节点指针               */
 tSpiState   SpiState;                                                  /*  spi当前的状态                 */
 
-uint16_t SpiTimer_rFPGA = 0;                                           /*  上电500ms复位FPGA             */
-bool     FPGA_ResetFlag = false;
-
+uint16_t   SpiTimer_rFPGA = 0;                                         /*  上电500ms复位FPGA             */
+tFpgaState FPGA_State;
 
 static void DMA_Config_SPI (void);
 static void SpecialPinInit(void);
@@ -64,20 +60,17 @@ static void ShellCallback_ResetFPGA (char *arg);
 {
     GPIO_InitTypeDef GPIO_InitStructure;
     SPI_InitTypeDef  SPI_InitStructure;
-//    NVIC_InitTypeDef NVIC_InitStruct;
-    
     
     listInit(&SpiTxList);                                              /*  初始化发送和接收链表          */
     listInit(&SpiRxList);
     memInit(&SpiTxMem,SpiTxBuff, sizeof(tSpiTxNode), SPI_TX_MAX_ITEM, "SpiTxMem");
     memInit(&SpiRxMem,SpiRxBuff, sizeof(tSpiRxNode), SPI_RX_MAX_ITEM, "SpiRxMem");
                                                                        /*  初始化发送和接受内存块        */
-    TriList  = &SpiRxList;
-    TriMem   = &SpiRxMem;
-    SpiState = SPI_IDLE;
-#if ExTri_Level_Edge
-    fReady   = 0;
-#endif   
+    TriList    = &SpiRxList;
+    TriMem     = &SpiRxMem;
+    FPGA_State = FPGA_UNKNOW;
+    SpiState   = SPI_IDLE;
+  
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB | RCC_APB2Periph_AFIO,ENABLE);
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_SPI2, ENABLE);
 
@@ -96,7 +89,7 @@ static void ShellCallback_ResetFPGA (char *arg);
     GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_IPU;
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
     GPIO_Init(GPIOB, &GPIO_InitStructure);                             /*  初始化CLK MOSI MISO NSS管脚   */
-	
+
     SPI_InitStructure.SPI_Direction         = SPI_Direction_2Lines_FullDuplex;
     SPI_InitStructure.SPI_Mode              = SPI_Mode_Master;
     SPI_InitStructure.SPI_DataSize          = SPI_DataSize_8b; 
@@ -116,7 +109,7 @@ static void ShellCallback_ResetFPGA (char *arg);
     ShellCmdAdd("od", ShellCallback_OutDelay, OutDelayHelp);
     ShellCmdAdd("dt", ShellCallback_DelayTri, DelayTriHelp);
     ShellCmdAdd("rf", ShellCallback_ResetFPGA, ResetFpgaHelp);
-    ShellPakaged("SPI2 Initialization is Complete!"endl);
+    Debug(SPI_DEBUG, "SPI2 Initialization is Complete!"endl);
 }
 
 /*
@@ -223,14 +216,11 @@ static void ConfigSPI_Rx(void) {
 void SpiReceve (void) {
     uint16_t tSPIDR = 0;
     
-#if ExTri_Level_Edge
-    if (SpiState == SPI_IDLE && fReady) {
-#else
-    if (FPGA_ResetFlag 
-        && SpiState == SPI_IDLE 
+    if ((FPGA_State == FPGA_RESET)
+        && (SpiState == SPI_IDLE) 
         && GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_3)
         && screenInfo.TriMode == Mode_SyncTri) {
-#endif
+            
         tNode *pNode;
         if (listGetCount(&SpiRxList) >= SPI_RX_MAX_ITEM) {
             pNode = listRemoveLast(&SpiRxList);
@@ -252,9 +242,7 @@ void SpiReceve (void) {
     } else if (SpiState == SPI_RECEVE_DONE) {
         NotifyFPGA(Mode_Transmit);
         listAddFirst(&SpiRxList, &(pSpiRxNode->node));
-#ifdef DEBUG
-        ShellPakaged("Receve Ok. %#llx"endl, *((uint64_t*)&(pSpiRxNode->buff)));
-#endif
+        Debug(SPI_DEBUG, "Receve Ok. %#llx"endl, *((uint64_t*)&(pSpiRxNode->buff)));
         pSpiRxNode = (tSpiRxNode*)0;        
         FlashOperate(FlashOp_TimestampSave);                           /*  保存时间戳                    */
         screenMsg.wTriBatch(0);
@@ -269,9 +257,18 @@ void SpiReceve (void) {
     SPI发送函数
 */
 void SpiTransmit (void) {
-    if (FPGA_ResetFlag && (SpiState == SPI_IDLE) && (listGetCount(&SpiTxList) > 0)) {
-        pSpiTxNode = getNodeParent(tSpiTxNode, node, listRemoveFirst(&SpiTxList));
-        
+    tNode *tmpNode;
+    
+    if (listGetCount(&SpiTxList) <= 0) {
+        return;
+    }
+    
+    if ((FPGA_State == FPGA_RESET) && (SpiState == SPI_IDLE)) {
+        tmpNode = listRemoveFirst(&SpiTxList);
+        if (tmpNode == (tNode*)0) {
+            return;
+        }
+        pSpiTxNode = getNodeParent(tSpiTxNode, node, tmpNode);
         DMA1_Channel5->CMAR = (uint32_t)&(pSpiTxNode->buff);           /*  更新spi DMA发送               */
         SpiState = SPI_TRANSMIT;
         ConfigSPI_Tx();                                                /*  配置并启动SPI发送             */
@@ -293,9 +290,7 @@ void SpiPackaged (tMsgMask mask, uint32_t value) {
     
     tmpTxNode = (tSpiTxNode*)memGet(&SpiTxMem);                        /*  申请一块内存                  */
     if (tmpTxNode == (tSpiTxNode*)0) {
-#ifdef DEBUG
-        ShellPakaged(Red(ERROR)": %s Out of Memory!"endl, SpiTxMem.name);
-#endif
+        Debug(SPI_DEBUG, Red(ERROR)": %s Out of Memory!"endl, SpiTxMem.name);
         return;
     }
     
@@ -355,79 +350,49 @@ void DMA1_Channel5_IRQHandler(void)
 */
 static void SpecialPinInit(void) {
     GPIO_InitTypeDef GPIO_InitStructure;
-#if ExTri_Level_Edge       
-    NVIC_InitTypeDef NVIC_InitStructure;    
-    EXTI_InitTypeDef EXTI_InitStructure;
-#endif    
+    
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_GPIOC, ENABLE);
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);
     
     GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_0;
-	GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_Out_PP;
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_Init(GPIOA, &GPIO_InitStructure);                             /*  PA0     复位FPGA              */
+    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_Out_PP;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init(GPIOA, &GPIO_InitStructure);                             /*  PA0     复位FPGA              */
     GPIO_SetBits(GPIOA,GPIO_Pin_0);
     
     GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_6;
-	GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_IPD;
-	GPIO_Init(GPIOA, &GPIO_InitStructure);                             /*  PA6     pps LOCK(1)           */
+    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_IPD;
+    GPIO_Init(GPIOA, &GPIO_InitStructure);                             /*  PA6     pps LOCK(1)           */
     
     GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_7;
-	GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_Out_PP;
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_Init(GPIOA, &GPIO_InitStructure);                             /*  PA7     发送1和接收0          */
+    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_Out_PP;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init(GPIOA, &GPIO_InitStructure);                             /*  PA7     发送1和接收0          */
     GPIO_SetBits(GPIOA,GPIO_Pin_7);
     
     GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_0;
-	GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_Out_PP;
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_Init(GPIOC, &GPIO_InitStructure);                             /*  PC0    启动定时触发           */
+    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_Out_PP;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init(GPIOC, &GPIO_InitStructure);                             /*  PC0    启动定时触发           */
     GPIO_ResetBits(GPIOC,GPIO_Pin_0);
     
     GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_1;
-	GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_Out_PP;
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_Init(GPIOC, &GPIO_InitStructure);                             /*  PC1    刹车                   */
+    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_Out_PP;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init(GPIOC, &GPIO_InitStructure);                             /*  PC1    刹车                   */
     GPIO_ResetBits(GPIOC,GPIO_Pin_1);
     
     GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_2;
-	GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_Out_PP;
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_Init(GPIOC, &GPIO_InitStructure);                             /*  PC2    触发模式               */
+    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_Out_PP;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init(GPIOC, &GPIO_InitStructure);                             /*  PC2    触发模式               */
     GPIO_ResetBits(GPIOC,GPIO_Pin_2);
     
     GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_3;
-	GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_IPD;
-	GPIO_Init(GPIOC, &GPIO_InitStructure);                             /*  PC3    触发通知               */
-#if ExTri_Level_Edge    
-    GPIO_EXTILineConfig(GPIO_PortSourceGPIOC, GPIO_PinSource3);        /*  PC3    外部中断               */
-
-    EXTI_InitStructure.EXTI_Line    = EXTI_Line3; 
-    EXTI_InitStructure.EXTI_Mode    = EXTI_Mode_Interrupt; 
-    EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising; 	           /*  上升沿触发                    */
-    EXTI_InitStructure.EXTI_LineCmd = ENABLE;
-    EXTI_Init(&EXTI_InitStructure);
-
-    NVIC_InitStructure.NVIC_IRQChannel                   = EXTI3_IRQn;
-    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
-    NVIC_InitStructure.NVIC_IRQChannelSubPriority        = 2;
-    NVIC_InitStructure.NVIC_IRQChannelCmd                = ENABLE;
-    NVIC_Init(&NVIC_InitStructure);
-#endif
+    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_IPD;
+    GPIO_Init(GPIOC, &GPIO_InitStructure);                             /*  PC3    触发通知               */
 }
 
-#if ExTri_Level_Edge
-/* 
-    外部触发中断服务函数
-*/
-void EXTI3_IRQHandler(void)
-{
-     if (EXTI_GetITStatus(EXTI_Line3)) {
-         EXTI_ClearITPendingBit(EXTI_Line3);
-         fReady = 1;
-     }
-}
-#endif
 /*
     通知fpga
 */
@@ -461,9 +426,7 @@ void NotifyFPGA(tMode mode) {
         case Mode_Reset:
             GPIO_ResetBits(GPIOA,GPIO_Pin_0);                          /*  复位FPGA                      */
             GPIO_SetBits(GPIOA,GPIO_Pin_0);
-#ifdef DEBUG
-            ShellPakaged("FPGA Reset is Complete!"endl);
-#endif
+            Debug(SPI_DEBUG, "FPGA Reset is Complete!"endl);
             break;
         
         case Mode_Transmit:                                            /*  发送数据                      */
@@ -483,28 +446,26 @@ void NotifyFPGA(tMode mode) {
     定时器回调函数
 */
 void TimerProcess_SPI(void) {
-    if (FPGA_ResetFlag == false) {
-        if (SpiTimer_rFPGA++ == RST_FPGA_WAITING) {
-            NotifyFPGA(Mode_Reset);
-            SpiPackaged(Mask_PO1, Config.po1 * 2);
-            SpiPackaged(Mask_PO2, Config.po2 * 2);
-            SpiPackaged(Mask_PO3, Config.po3 * 2);
-            SpiPackaged(Mask_PO4, Config.po4 * 2);
-            SpiPackaged(Mask_EO1, Config.eo1 * 2);
-            SpiPackaged(Mask_EO2, Config.eo2 * 2);
-            SpiPackaged(Mask_EO3, Config.eo3 * 2);
-            SpiPackaged(Mask_EO4, Config.eo4 * 2);
-            SpiPackaged(Mask_EO5, Config.eo5 * 2);
-            SpiPackaged(Mask_EO6, Config.eo6 * 2);
-            SpiPackaged(Mask_EO7, Config.eo7 * 2);
-            SpiPackaged(Mask_EO8, Config.eo8 * 2);
-            SpiPackaged(Mask_triDelay, Config.triDelay * 2);
-            FPGA_ResetFlag = true;
-        }
+    if (FPGA_State != FPGA_UNKNOW) {
+        return;
     }
-    
-    
-    
+    if (SpiTimer_rFPGA++ == RST_FPGA_WAITING) {
+        NotifyFPGA(Mode_Reset);
+        SpiPackaged(Mask_PO1, Config.po1 * CONFIG_FACTOR);
+        SpiPackaged(Mask_PO2, Config.po2 * CONFIG_FACTOR);
+        SpiPackaged(Mask_PO3, Config.po3 * CONFIG_FACTOR);
+        SpiPackaged(Mask_PO4, Config.po4 * CONFIG_FACTOR);
+        SpiPackaged(Mask_EO1, Config.eo1 * CONFIG_FACTOR);
+        SpiPackaged(Mask_EO2, Config.eo2 * CONFIG_FACTOR);
+        SpiPackaged(Mask_EO3, Config.eo3 * CONFIG_FACTOR);
+        SpiPackaged(Mask_EO4, Config.eo4 * CONFIG_FACTOR);
+        SpiPackaged(Mask_EO5, Config.eo5 * CONFIG_FACTOR);
+        SpiPackaged(Mask_EO6, Config.eo6 * CONFIG_FACTOR);
+        SpiPackaged(Mask_EO7, Config.eo7 * CONFIG_FACTOR);
+        SpiPackaged(Mask_EO8, Config.eo8 * CONFIG_FACTOR);
+        SpiPackaged(Mask_triDelay, Config.triDelay * CONFIG_FACTOR);
+        FPGA_State = FPGA_RESET;
+    }
 }
 
 /*
@@ -526,14 +487,14 @@ static void ShellCallback_GetRecord(char* arg) {
     
     if (arg != NULL) { 
         tmpListCnt = tmpListCnt <= atoi(&arg[1]) ? tmpListCnt : atoi(&arg[1]);
-        
+
         if((arg[0] != '-') || ( tmpListCnt == 0)) {
-            ShellPakaged(ErrArgument);
+            Debug(SPI_DEBUG, "%s", ErrArgument);
             return;
         }
     }
     
-    ShellPakaged(RecordHead);
+    Debug(SPI_DEBUG, "%s", RecordHead);
     tmpNode = listGetFirst(TriList);
     if (tmpNode == (tNode*)0) {
         return;
@@ -571,7 +532,7 @@ static void ShellCallback_GetRecord(char* arg) {
                                     tmpMs, tmpUs, tmpNs);              /*  时间戳                        */
         tmpBuff[tmpIndex] = '\0';
 
-        ShellPakaged(tmpBuff);
+        Debug(SPI_DEBUG, "%s", tmpBuff);
         
         tmpNode = listGetNext(TriList, tmpNode);
         if (tmpNode == (tNode*)0) {
@@ -597,7 +558,7 @@ static void ShellCallback_OutDelay(char *arg) {
     
     tmpStart = (uint32_t*)&Config;
     if (arg == NULL) {                                                 /*  显示所有通道延迟值            */
-        ShellPakaged(DelayHead);
+        Debug(SPI_DEBUG, "%s", DelayHead);
         
         for (uint8_t i =0; i < 11; i++) {
             tmpIndex   = sprintf(tmpBuff, "   %2u       \033[34;1m", i + 1);
@@ -616,26 +577,26 @@ static void ShellCallback_OutDelay(char *arg) {
                                                 *tmpStart / 100, *tmpStart % 100);                    
             tmpBuff[tmpIndex] = '\0';
             
-            ShellPakaged(tmpBuff);
+            Debug(SPI_DEBUG, "%s", tmpBuff);
             tmpStart++;
         }
     } else {                                                           /*  设置指定通道延迟值            */
         
         if((arg[0] != '-') || ((arg[1] != 'p') && (arg[1] != 'e'))) {  /*  参数有效性检测                */
-            ShellPakaged(ErrArgument);
+            Debug(SPI_DEBUG, "%s", ErrArgument);
             return;
         }
         
         tmpCh = atoi(&arg[2]);
         
         if (tmpCh == 0) {                                              /*  参数有效性检测                */
-            ShellPakaged(ErrArgument);
+            Debug(SPI_DEBUG, "%s", ErrArgument);
             return;
         }
         
         token = strtok(NULL, DELIM);
         if (token == NULL) {                                           /*  参数有效性检测                */
-            ShellPakaged(FewArgument);
+            Debug(SPI_DEBUG, "%s", FewArgument);
             return;
         }
         
@@ -654,7 +615,7 @@ static void ShellCallback_OutDelay(char *arg) {
 
             if (tmpPre > 3){
                 *token = '\0';
-                ShellPakaged("Exceeds maximum accuracy. delta(t) = 0.01 us"endl);
+                Debug(SPI_DEBUG, "Exceeds maximum accuracy. delta(t) = 0.01 us"endl);
                 break;
             }
             token++;
@@ -666,18 +627,18 @@ static void ShellCallback_OutDelay(char *arg) {
         
         if (tmpValue > 0x5F5E100) {                                    /*  1秒                           */
             tmpValue = 0x5F5E100;  
-            ShellPakaged("The delay time is greater than 1 second."endl);
+            Debug(SPI_DEBUG, "The delay time is greater than 1 second."endl);
         }
         
         if (arg[1] == 'p') {
             tmpStart += tmpCh - 1;
             *tmpStart = tmpValue;
-            SpiPackaged((tMsgMask)(tmpCh - 1), tmpValue * 2);
+            SpiPackaged((tMsgMask)(tmpCh - 1), tmpValue * CONFIG_FACTOR);
         } else {
             
             tmpStart += tmpCh + 3;
             *tmpStart = tmpValue;
-            SpiPackaged((tMsgMask)(tmpCh + 3), tmpValue * 2);
+            SpiPackaged((tMsgMask)(tmpCh + 3), tmpValue * CONFIG_FACTOR);
         }
             FlashOperate(FlashOp_ConfigSave);
             screenMsg.wSetBatch(0);
@@ -695,17 +656,17 @@ static void ShellCallback_DelayTri(char *arg) {
     uint32_t    tmpValue;
     
     if (arg == NULL) {
-        ShellPakaged(Blue(Delay Trigger:)" %7u.%.2u(us)"endl,
+        Debug(SPI_DEBUG, Blue(Delay Trigger:)" %7u.%.2u(us)"endl,
                      Config.triDelay / 100, Config.triDelay % 100);
     } else {
         if((arg[0] != '-') || (arg[1] != 'p')) {                       /*  参数有效性检测                */
-            ShellPakaged(ErrArgument);
+            Debug(SPI_DEBUG, "%s", ErrArgument);
             return;
         }
         
         token = strtok(NULL, DELIM);
         if (token == NULL) {                                           /*  参数有效性检测                */
-            ShellPakaged(FewArgument);
+            Debug(SPI_DEBUG, "%s", FewArgument);
             return;
         }
         
@@ -724,7 +685,7 @@ static void ShellCallback_DelayTri(char *arg) {
 
             if (tmpPre > 3){
                 *token = '\0';
-                ShellPakaged("Exceeds maximum accuracy. delta(t) = 0.01 us"endl);
+                Debug(SPI_DEBUG, "Exceeds maximum accuracy. delta(t) = 0.01 us"endl);
                 break;
             }
             token++;
@@ -736,11 +697,11 @@ static void ShellCallback_DelayTri(char *arg) {
         
         if (tmpValue > 0x3B9AC9FF) {                                   /*  10秒                          */
             tmpValue = 0x3B9AC9FF;  
-            ShellPakaged("The delay time is greater than 1 second."endl);
+            Debug(SPI_DEBUG, "The delay time is greater than 1 second."endl);
         }
         
         Config.triDelay = tmpValue;
-        SpiPackaged(Mask_triDelay, tmpValue * 2);
+        SpiPackaged(Mask_triDelay, tmpValue * CONFIG_FACTOR);
         FlashOperate(FlashOp_ConfigSave);
         screenMsg.wTriDelay(0);
     }

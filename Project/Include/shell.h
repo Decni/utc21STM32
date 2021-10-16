@@ -17,6 +17,26 @@
 #define Green(str) COLOR_START COLOR_FG_GREEN COLOR_TYPE_BOLD #str COLOR_STOP
 #define Blue(str)  COLOR_START COLOR_FG_BLUE  COLOR_TYPE_BOLD #str COLOR_STOP
 
+#define SHELL_DEBUG  (uint32_t)(1 << 0)                                /*  各模块的 DEBUG 开关掩码       */
+#define SPI_DEBUG    (uint32_t)(1 << 1)
+#define SCREEN_DEBUG (uint32_t)(1 << 2)
+#define GPS_DEBUG    (uint32_t)(1 << 3)
+#define FLASH_DEBUG  (uint32_t)(1 << 4)
+#define MEMORY_DEBUG (uint32_t)(1 << 5)
+#define TIMER_DEBUG  (uint32_t)(1 << 6)
+
+#ifdef DEBUG
+    extern uint32_t DebugFlag;
+    #define Debug(flag, format, ...) \
+              do {\
+                  if (DebugFlag & flag) {\
+                      ShellPakaged("[%s:%d->%s] "format, __FILE__, __LINE__, __func__, ##__VA_ARGS__);\
+                  }\
+              }while(0)
+#else
+    #define Debug(flag, format, ...)
+#endif
+
 typedef struct _shellTxNode {
     tNode   node;
     uint8_t buff[SHELL_TX_MAX_BYTE];

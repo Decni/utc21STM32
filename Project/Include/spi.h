@@ -4,15 +4,15 @@
 #include "list.h"
 #include "memory.h"
 
-#define SPI_TX_MAX_BYTE   5
-#define SPI_TX_MAX_ITEM  20
-#define SPI_RX_MAX_BYTE   8
-#define SPI_RX_MAX_ITEM  20
+#define SPI_TX_MAX_BYTE       5
+#define SPI_TX_MAX_ITEM      20
+#define SPI_RX_MAX_BYTE       8
+#define SPI_RX_MAX_ITEM      20
 
-#define RST_FPGA_WAITING  5000                                         /*  u16 上电 500ms 复位 fpga      */
-
-#define ExTri_Level_Edge  0                                            /*  FPGA 触发通知方式 0 - lever   */
-
+#define RST_FPGA_WAITING   5000                                        /*  u16 上电 500ms 复位 fpga      */
+#define FPGA_CNT_UNITS_ns     5                                        /*  FPGA 计数器单位为 5 ns        */
+#define HUMEN_SET_UNITS_ns   10                                        /*  设置步进量为 10 ns            */
+#define CONFIG_FACTOR       (HUMEN_SET_UNITS_ns / FPGA_CNT_UNITS_ns)
 typedef struct _spiTxNode {
     tNode   node;
     uint8_t buff[SPI_TX_MAX_BYTE];
@@ -93,9 +93,17 @@ typedef enum _spiState {
     
 }tSpiState;
 
-extern tList    *TriList;
-extern tMemory  *TriMem;
-extern tConfig Config;
+typedef enum _fpgaState {
+    FPGA_UNKNOW,
+    FPGA_RESET,
+    FPGA_TIMEINIT,
+    FPGA_WORK,
+}tFpgaState;
+
+extern tList     *TriList;
+extern tMemory   *TriMem;
+extern tConfig    Config;
+extern tFpgaState FPGA_State;
 
 void ComInit_SPI(void);                                                /*  SPI初始化函数                 */
 void SpiReceve (void);                                                 /*  SPI接收函数                   */

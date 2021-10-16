@@ -11,7 +11,13 @@
 #define CHAR_CR     '\r'
 #define CHAR_LF     '\n'
 #define CHAR_TAB    '\t'
-
+uint32_t DebugFlag =  SHELL_DEBUG                                      /*  开关各模块的 DEBUG            */
+                    | SPI_DEBUG
+                    | SCREEN_DEBUG
+                    | GPS_DEBUG
+                    | FLASH_DEBUG
+                    | MEMORY_DEBUG
+                    | TIMER_DEBUG;
 
 const char *UnknowCmd   = "Unknown Command!"endl;
 const char *FewArgument = "Too Few Argument!"endl;
@@ -36,7 +42,7 @@ tShellComState ShellComState, ShellComRxState;                         /*  shell
 
 static void ShellCallback_ShowHelp (char *arg);
 static void Shellcallback_ClearScreen (char *arg);
-void ShellCallback_SoftReset(char *arg);
+static void ShellCallback_SoftReset(char *arg);
 
 /*
     Shell串口初始化函数
@@ -47,10 +53,10 @@ void ComInit_Shell (uint32_t USART_BaudRate) {
     NVIC_InitTypeDef  NVIC_InitStruct;
 
     listInit(&ShellTxList);                                            /*  初始化发送和接收链表          */
-	listInit(&ShellRxList);
+    listInit(&ShellRxList);
     listInit(&ShellCmdList);
     memInit(&ShellTxMem,ShellTxBuff, sizeof(tShellTxNode), SHELL_TX_MAX_ITEM, "ShellTxMem");
-	memInit(&ShellRxMem,ShellRxBuff, sizeof(tShellRxNode), SHELL_RX_MAX_ITEM, "ShellRxMem");
+    memInit(&ShellRxMem,ShellRxBuff, sizeof(tShellRxNode), SHELL_RX_MAX_ITEM, "ShellRxMem");
     memInit(&ShellCmdMem,ShellCmdBuff, sizeof(tShellCmdNode), SHELL_CMD_MAX_ITEM, "ShellCmdMem");
                                                                        /*  初始化发送和接受内存块        */ 
     pShellRxNodeA    = (tShellRxNode*)memGet(&ShellTxMem);             /*  初始化接收节点                */
@@ -67,7 +73,6 @@ void ComInit_Shell (uint32_t USART_BaudRate) {
     RCC_APB2PeriphClockCmd(Shell_COM_CLK,ENABLE);
     GPIO_PinRemapConfig(GPIO_Remap_USART1,ENABLE);
     
-	
     GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;
     GPIO_InitStructure.GPIO_Pin   = Shell_COM_TX_PIN;
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_10MHz;
@@ -76,7 +81,7 @@ void ComInit_Shell (uint32_t USART_BaudRate) {
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
     GPIO_InitStructure.GPIO_Pin  = Shell_COM_RX_PIN;
     GPIO_Init(Shell_COM_RX_PORT, &GPIO_InitStructure);
-	
+
     USART_InitStruct.USART_BaudRate            = USART_BaudRate;
     USART_InitStruct.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
     USART_InitStruct.USART_Mode                = USART_Mode_Rx | USART_Mode_Tx;
@@ -86,16 +91,16 @@ void ComInit_Shell (uint32_t USART_BaudRate) {
     USART_Init(Shell_COM, &USART_InitStruct);
     
     NVIC_InitStruct.NVIC_IRQChannel                   = Shell_COM_IRQn;
-	NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority = 2;
-	NVIC_InitStruct.NVIC_IRQChannelSubPriority        = 1;
-	NVIC_InitStruct.NVIC_IRQChannelCmd                = ENABLE;
-	NVIC_Init(&NVIC_InitStruct);
-  
-	USART_ClearFlag(Shell_COM,USART_FLAG_RXNE);
+    NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority = 2;
+    NVIC_InitStruct.NVIC_IRQChannelSubPriority        = 1;
+    NVIC_InitStruct.NVIC_IRQChannelCmd                = ENABLE;
+    NVIC_Init(&NVIC_InitStruct);
+    
+    USART_ClearFlag(Shell_COM,USART_FLAG_RXNE);
     USART_ClearFlag(Shell_COM,USART_FLAG_TC);
     USART_ITConfig(Shell_COM,USART_IT_RXNE,ENABLE);
-	USART_ITConfig(Shell_COM,USART_IT_TC,ENABLE);                      /*  使能串口收发中断              */
-	
+    USART_ITConfig(Shell_COM,USART_IT_TC,ENABLE);                      /*  使能串口收发中断              */
+    
     USART_Cmd(Shell_COM, ENABLE);
     
 
@@ -103,7 +108,7 @@ void ComInit_Shell (uint32_t USART_BaudRate) {
     ShellCmdAdd("ms", ShellCallback_Memory, MemHelp);
     ShellCmdAdd("cls", Shellcallback_ClearScreen, ClsHelp);
     ShellCmdAdd("rst", ShellCallback_SoftReset, RstHelp);
-    ShellPakaged("\rShell Com Initialization is Complete!"endl);  
+    Debug(SHELL_DEBUG, "\rShell Com Initialization is Complete!"endl);  
 }
 
 /*
@@ -115,6 +120,7 @@ void ShellPakaged(const char* format, ...) {
     
     tmpTxNode = (tShellTxNode*)memGet(&ShellTxMem);                    /*  申请一块内存                  */
     if (tmpTxNode == (tShellTxNode*)0) {
+        Debug(SHELL_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
         return;
     }
     
@@ -162,9 +168,7 @@ void ShellReceve(void) {
                 if (pShellRxNodeB != 0) {
                     pShellRxNodeB->msgCnt = 0;
                 } else {
-#ifdef DEBUG
-                    ShellPakaged(Red(ERROR)": %s Out Of Memory!"endl, __func__);
-#endif
+                    Debug(SHELL_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
                 }
             } else {
                 pShellRxNodeB->msgCnt = 0;
@@ -177,9 +181,7 @@ void ShellReceve(void) {
                 if (pShellRxNodeA != 0) {
                     pShellRxNodeA->msgCnt = 0;
                 } else {
-#ifdef DEBUG
-                    ShellPakaged(Red(ERROR)": %s Out Of Memory!"endl, __func__);
-#endif
+                    Debug(SHELL_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
                 }
             } else {
                 pShellRxNodeA->msgCnt = 0;
@@ -272,17 +274,13 @@ void ShellEchoProcess(uint16_t ch) {
                     if (pShellRxNodeB != (tShellRxNode*)0) {
                         pShellRxNodeCurr = pShellRxNodeB;
                     } else {
-#ifdef DEBUG
-                    ShellPakaged(Red(ERROR)": Shell Receve Buffer Invalid!"endl);
-#endif
+                        Debug(SHELL_DEBUG, Red(ERROR)": Shell Receve Buffer Invalid!"endl);
                     }
                 } else {
                     if (pShellRxNodeA != (tShellRxNode*)0) {
                         pShellRxNodeCurr = pShellRxNodeA;
                     } else {
-#ifdef DEBUG
-                    ShellPakaged(Red(ERROR)": Shell Receve Buffer Invalid!"endl);
-#endif
+                        Debug(SHELL_DEBUG, Red(ERROR)": Shell Receve Buffer Invalid!"endl);
                     }
                 }
                 pShellRxNodeCurr->msgCnt = 0;
@@ -310,13 +308,13 @@ void ShellEchoProcess(uint16_t ch) {
 void Shell_COM_IRQHandler(void) {
     uint16_t ch;
     
-	if(USART_GetITStatus(Shell_COM,USART_IT_RXNE)) {                   /*  接收中断                      */
+    if(USART_GetITStatus(Shell_COM,USART_IT_RXNE)) {                   /*  接收中断                      */
         USART_ClearITPendingBit(Shell_COM,USART_IT_RXNE);
         
-		ch = USART_ReceiveData(Shell_COM);
+        ch = USART_ReceiveData(Shell_COM);
         ShellEchoProcess(ch);
     }
-	
+    
     if(USART_GetITStatus(Shell_COM,USART_IT_TC))                       /*  发送中断                      */
     {
         USART_ClearITPendingBit(Shell_COM,USART_IT_TC);
@@ -350,9 +348,7 @@ void ShellCmdAdd(const char *cmd, tShellFun fun, const char *help) {
 
     pCmdNode = (tShellCmdNode*)memGet(&ShellCmdMem);
     if (pCmdNode == (tShellCmdNode*)0) {
-#ifdef DEBUG
-        ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
-#endif
+    Debug(SHELL_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
         return;
     }
     pCmdNode->cmd  = cmd;
@@ -392,7 +388,7 @@ static void Shellcallback_ClearScreen(char *arg) {
 /*
     软复位
 */
-void ShellCallback_SoftReset(char *arg) {
+static void ShellCallback_SoftReset(char *arg) {
     __set_FAULTMASK(1);                                                /*  关闭所有中断                  */ 
     NVIC_SystemReset();                                                /*  复位                          */ 
 }
@@ -402,14 +398,14 @@ void ShellCallback_SoftReset(char *arg) {
 */
 void ShellSplash(void) {
     ShellPakaged(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"endl);
-    ShellPakaged("  kkkk  kkk     kkkkkk     kkk     kkkk         kkkkkkk     "endl);
-    ShellPakaged("   kk  kk         kk       kk k     kk        kk       kk   "endl);
-    ShellPakaged("   kk kk          kk       kk kk    kk      kk              "endl);
-    ShellPakaged("   kkk            kk       kk  kk   kk      kk      kkkkk   "endl);
-    ShellPakaged("   kkkkk          kk       kk   k   kk      kk         kk   "endl);
-    ShellPakaged("   kk  kk         kk       kk    kk kk      kk         kk   "endl);
-    ShellPakaged("   kk   kk        kk       kk     k kk        kk       kk   "endl);
-    ShellPakaged("  kkkk  kkk     kkkkkk    kkkk     kkk          kkkkkkk     "endl);
+    ShellPakaged("^ kkkk  kkk     kkkkkk     kkk     kkkk         kkkkkkk    v"endl);
+    ShellPakaged("^  kk  kk         kk       kk k     kk        kk       kk  v"endl);
+    ShellPakaged("^  kk kk          kk       kk kk    kk      kk             v"endl);
+    ShellPakaged("^  kkk            kk       kk  kk   kk      kk      kkkkk  v"endl);
+    ShellPakaged("^  kkkkk          kk       kk   k   kk      kk         kk  v"endl);
+    ShellPakaged("^  kk  kk         kk       kk    kk kk      kk         kk  v"endl);
+    ShellPakaged("^  kk   kk        kk       kk     k kk        kk       kk  v"endl);
+    ShellPakaged("^ kkkk  kkk     kkkkkk    kkkk     kkk          kkkkkkk    v"endl);
     ShellPakaged("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"endl);
     ShellPakaged(Green(KD>\040));
 }

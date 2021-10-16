@@ -39,31 +39,30 @@ const char *ScreenPowerHelp = "        "Blue(sp)": screen power."endl
 /*
     函数功能：屏幕串口初始化
 */
-void ComInit_Screen(uint32_t USART_BaudRate)
-{
-	GPIO_InitTypeDef  GPIO_InitStructure;
-	USART_InitTypeDef USART_InitStruct;
+void ComInit_Screen(uint32_t USART_BaudRate) {
+    GPIO_InitTypeDef  GPIO_InitStructure;
+    USART_InitTypeDef USART_InitStruct;
     NVIC_InitTypeDef  NVIC_InitStruct;
     
-	listInit(&ScreenTxList);                                           /*  初始化发送和接收链表          */
-	listInit(&ScreenRxList);
+    listInit(&ScreenTxList);                                           /*  初始化发送和接收链表          */
+    listInit(&ScreenRxList);
     memInit(&ScreenTxMem,ScreenTxBuff, sizeof(tScreenTxNode), SCREEN_TX_MAX_ITEM, "ScreenTxMem");
-	memInit(&ScreenRxMem,ScreenRxBuff, sizeof(tScreenRxNode), SCREEN_RX_MAX_ITEM, "ScreenRxMem");
-                                                                       /*  初始化发送和接受内存块        */ 
+    memInit(&ScreenRxMem,ScreenRxBuff, sizeof(tScreenRxNode), SCREEN_RX_MAX_ITEM, "ScreenRxMem");
+                                                                    /*  初始化发送和接受内存块        */ 
     pScreenRxNodeA    = (tScreenRxNode*)memGet(&ScreenTxMem);          /*  初始化接收节点                */
     pScreenRxNodeB    = (tScreenRxNode*)memGet(&ScreenTxMem);
     pScreenRxNodeCurr = pScreenRxNodeA;
-	
-	RCC_APB2PeriphClockCmd(SCREEN_COM_TX_CLK | SCREEN_COM_RX_CLK       /*  串口管脚时钟                  */
-                          | RCC_APB2Periph_AFIO | SCREEN_POWER_CTRL_CLK,ENABLE);
-	RCC_APB1PeriphClockCmd(SCREEN_COM_CLK,ENABLE);                     /*  屏幕串口时钟                  */
-	
-	GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_Out_PP;
+    
+    RCC_APB2PeriphClockCmd(SCREEN_COM_TX_CLK | SCREEN_COM_RX_CLK       /*  串口管脚时钟                  */
+                        | RCC_APB2Periph_AFIO | SCREEN_POWER_CTRL_CLK,ENABLE);
+    RCC_APB1PeriphClockCmd(SCREEN_COM_CLK,ENABLE);                     /*  屏幕串口时钟                  */
+    
+    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_Out_PP;
     GPIO_InitStructure.GPIO_Pin   = SCREEN_POWER_CTRL_PIN;
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
     GPIO_Init(SCREEN_POWER_CTRL_PORT, &GPIO_InitStructure);            /*  屏幕上电管脚                  */
-	GPIO_SetBits(SCREEN_POWER_CTRL_PORT,SCREEN_POWER_CTRL_PIN);        /*  关闭屏幕                      */
-	
+    GPIO_SetBits(SCREEN_POWER_CTRL_PORT,SCREEN_POWER_CTRL_PIN);        /*  关闭屏幕                      */
+    
     GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;    
     GPIO_InitStructure.GPIO_Pin   = SCREEN_COM_TX_PIN;
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
@@ -72,90 +71,87 @@ void ComInit_Screen(uint32_t USART_BaudRate)
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
     GPIO_InitStructure.GPIO_Pin  = SCREEN_COM_RX_PIN;
     GPIO_Init(SCREEN_COM_RX_PORT, &GPIO_InitStructure);                /*  屏幕串口接收管脚              */
-	
-	DMA_Config_Screen();                                               /*  屏幕串口DMA配置               */
-	
-	USART_InitStruct.USART_BaudRate            = USART_BaudRate;
-	USART_InitStruct.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
-	USART_InitStruct.USART_Mode                = USART_Mode_Rx | USART_Mode_Tx;
-	USART_InitStruct.USART_Parity              = USART_Parity_No;
-	USART_InitStruct.USART_StopBits            = USART_StopBits_1;
-	USART_InitStruct.USART_WordLength          = USART_WordLength_8b;
+    
+    DMA_Config_Screen();                                               /*  屏幕串口DMA配置               */
+    
+    USART_InitStruct.USART_BaudRate            = USART_BaudRate;
+    USART_InitStruct.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+    USART_InitStruct.USART_Mode                = USART_Mode_Rx | USART_Mode_Tx;
+    USART_InitStruct.USART_Parity              = USART_Parity_No;
+    USART_InitStruct.USART_StopBits            = USART_StopBits_1;
+    USART_InitStruct.USART_WordLength          = USART_WordLength_8b;
     USART_Init(SCREEN_COM, &USART_InitStruct);                         /*  屏幕串口配置                  */
     
     NVIC_InitStruct.NVIC_IRQChannel                   = SCREEN_COM_IRQn;
-	NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority = 2;
-	NVIC_InitStruct.NVIC_IRQChannelSubPriority        = 1;
-	NVIC_InitStruct.NVIC_IRQChannelCmd                = ENABLE;
-	NVIC_Init(&NVIC_InitStruct);
-
-    USART_ClearFlag(SCREEN_COM,USART_FLAG_TXE);	
-	USART_DMACmd(SCREEN_COM,USART_DMAReq_Rx,ENABLE);                   /*  使能屏幕串口DMA请求           */
-	USART_DMACmd(SCREEN_COM,USART_DMAReq_Tx,DISABLE);
-
-	USART_ClearFlag(SCREEN_COM,USART_FLAG_IDLE);                       /*  使能屏幕串口空闲和发送中断    */
-	USART_ClearFlag(SCREEN_COM,USART_FLAG_TC);  
-	USART_ITConfig(SCREEN_COM,USART_IT_IDLE,ENABLE);
-	USART_ITConfig(SCREEN_COM,USART_IT_TC,ENABLE);
+    NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority = 2;
+    NVIC_InitStruct.NVIC_IRQChannelSubPriority        = 1;
+    NVIC_InitStruct.NVIC_IRQChannelCmd                = ENABLE;
+    NVIC_Init(&NVIC_InitStruct);
     
-	ScreenComStateTx = ScreenComState_TransmitIdle;                    /*  初始化收发端口状态            */
-	ScreenComStateRx = ScreenComState_ReceiveIdle;
-
-	ScreenStateInit();                                                 /*  初始化屏幕状态                */
-	
-	USART_Cmd(SCREEN_COM, ENABLE);
+    USART_ClearFlag(SCREEN_COM,USART_FLAG_TXE);	
+    USART_DMACmd(SCREEN_COM,USART_DMAReq_Rx,ENABLE);                   /*  使能屏幕串口DMA请求           */
+    USART_DMACmd(SCREEN_COM,USART_DMAReq_Tx,DISABLE);
+    
+    USART_ClearFlag(SCREEN_COM,USART_FLAG_IDLE);                       /*  使能屏幕串口空闲和发送中断    */
+    USART_ClearFlag(SCREEN_COM,USART_FLAG_TC);  
+    USART_ITConfig(SCREEN_COM,USART_IT_IDLE,ENABLE);
+    USART_ITConfig(SCREEN_COM,USART_IT_TC,ENABLE);
+    
+    ScreenComStateTx = ScreenComState_TransmitIdle;                    /*  初始化收发端口状态            */
+    ScreenComStateRx = ScreenComState_ReceiveIdle;
+    
+    ScreenStateInit();                                                 /*  初始化屏幕状态                */
+    
+    USART_Cmd(SCREEN_COM, ENABLE);
 
     ShellCmdAdd("sp", ShellCallback_ScreenPower, ScreenPowerHelp);
-    ShellPakaged("Screen Com Initialization is Complete!"endl);
+    Debug(SCREEN_DEBUG, "Screen Com Initialization is Complete!"endl);
 }
 
 /*
     屏幕串口DMA配置
 */
-static void DMA_Config_Screen(void)
-{
-	DMA_InitTypeDef DMA_InitStruct;	
+static void DMA_Config_Screen(void) {
+    DMA_InitTypeDef DMA_InitStruct;
     
-	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1,ENABLE);                  /*  使能DMA1时钟                  */
+    RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1,ENABLE);                  /*  使能DMA1时钟                  */
     
-	DMA_Cmd(SCREEN_COM_RX_DMA1CHANNEL,DISABLE);                        /*  屏幕串口接收DMA配置           */
-	DMA_DeInit(SCREEN_COM_RX_DMA1CHANNEL);	
-	DMA_InitStruct.DMA_PeripheralBaseAddr = (uint32_t)(&(SCREEN_COM->DR));
-	DMA_InitStruct.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;
-	DMA_InitStruct.DMA_PeripheralInc      = DMA_PeripheralInc_Disable;
-	DMA_InitStruct.DMA_MemoryBaseAddr     = (uint32_t)(pScreenRxNodeCurr->buff);
-	DMA_InitStruct.DMA_MemoryDataSize     = DMA_MemoryDataSize_Byte;
-	DMA_InitStruct.DMA_MemoryInc          = DMA_MemoryInc_Enable;
-	DMA_InitStruct.DMA_DIR                = DMA_DIR_PeripheralSRC;
-	DMA_InitStruct.DMA_BufferSize         = SCREEN_RX_MAX_BYTE;
-	DMA_InitStruct.DMA_Priority           = DMA_Priority_Medium;
-	DMA_InitStruct.DMA_Mode               = DMA_Mode_Normal;
+    DMA_Cmd(SCREEN_COM_RX_DMA1CHANNEL,DISABLE);                        /*  屏幕串口接收DMA配置           */
+    DMA_DeInit(SCREEN_COM_RX_DMA1CHANNEL);
+    DMA_InitStruct.DMA_PeripheralBaseAddr = (uint32_t)(&(SCREEN_COM->DR));
+    DMA_InitStruct.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;
+    DMA_InitStruct.DMA_PeripheralInc      = DMA_PeripheralInc_Disable;
+    DMA_InitStruct.DMA_MemoryBaseAddr     = (uint32_t)(pScreenRxNodeCurr->buff);
+    DMA_InitStruct.DMA_MemoryDataSize     = DMA_MemoryDataSize_Byte;
+    DMA_InitStruct.DMA_MemoryInc          = DMA_MemoryInc_Enable;
+    DMA_InitStruct.DMA_DIR                = DMA_DIR_PeripheralSRC;
+    DMA_InitStruct.DMA_BufferSize         = SCREEN_RX_MAX_BYTE;
+    DMA_InitStruct.DMA_Priority           = DMA_Priority_Medium;
+    DMA_InitStruct.DMA_Mode               = DMA_Mode_Normal;
     DMA_InitStruct.DMA_M2M                = DMA_M2M_Disable;
-	DMA_Init(SCREEN_COM_RX_DMA1CHANNEL,&DMA_InitStruct);
+    DMA_Init(SCREEN_COM_RX_DMA1CHANNEL,&DMA_InitStruct);
     DMA_ITConfig(SCREEN_COM_TX_DMA1CHANNEL, DMA_IT_TC, DISABLE);
     DMA_ITConfig(SCREEN_COM_TX_DMA1CHANNEL, DMA_IT_TE, DISABLE);
     DMA_ITConfig(SCREEN_COM_TX_DMA1CHANNEL, DMA_IT_HT, DISABLE);
     DMA_Cmd(SCREEN_COM_RX_DMA1CHANNEL,ENABLE);
-
-	DMA_Cmd(SCREEN_COM_TX_DMA1CHANNEL,DISABLE);                        /*  屏幕串口发送DMA配置           */
-	DMA_DeInit(SCREEN_COM_TX_DMA1CHANNEL);	
-	DMA_InitStruct.DMA_PeripheralBaseAddr = (uint32_t)(&(SCREEN_COM->DR));
-	DMA_InitStruct.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;
-	DMA_InitStruct.DMA_PeripheralInc      = DMA_PeripheralInc_Disable;
-	DMA_InitStruct.DMA_MemoryBaseAddr     = (uint32_t)0;
-	DMA_InitStruct.DMA_MemoryDataSize     = DMA_MemoryDataSize_Byte;
-	DMA_InitStruct.DMA_MemoryInc          = DMA_MemoryInc_Enable;
-	DMA_InitStruct.DMA_DIR                = DMA_DIR_PeripheralDST;
-	DMA_InitStruct.DMA_BufferSize         = 0;
-	DMA_InitStruct.DMA_Priority           = DMA_Priority_Low;
-	DMA_InitStruct.DMA_Mode               = DMA_Mode_Normal;
+    
+    DMA_Cmd(SCREEN_COM_TX_DMA1CHANNEL,DISABLE);                        /*  屏幕串口发送DMA配置           */
+    DMA_DeInit(SCREEN_COM_TX_DMA1CHANNEL);
+    DMA_InitStruct.DMA_PeripheralBaseAddr = (uint32_t)(&(SCREEN_COM->DR));
+    DMA_InitStruct.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;
+    DMA_InitStruct.DMA_PeripheralInc      = DMA_PeripheralInc_Disable;
+    DMA_InitStruct.DMA_MemoryBaseAddr     = (uint32_t)0;
+    DMA_InitStruct.DMA_MemoryDataSize     = DMA_MemoryDataSize_Byte;
+    DMA_InitStruct.DMA_MemoryInc          = DMA_MemoryInc_Enable;
+    DMA_InitStruct.DMA_DIR                = DMA_DIR_PeripheralDST;
+    DMA_InitStruct.DMA_BufferSize         = 0;
+    DMA_InitStruct.DMA_Priority           = DMA_Priority_Low;
+    DMA_InitStruct.DMA_Mode               = DMA_Mode_Normal;
     DMA_InitStruct.DMA_M2M                = DMA_M2M_Disable;
-	DMA_Init(SCREEN_COM_TX_DMA1CHANNEL,&DMA_InitStruct);
+    DMA_Init(SCREEN_COM_TX_DMA1CHANNEL,&DMA_InitStruct);
     DMA_ITConfig(SCREEN_COM_TX_DMA1CHANNEL, DMA_IT_TC, DISABLE);
     DMA_ITConfig(SCREEN_COM_TX_DMA1CHANNEL, DMA_IT_TE, DISABLE);
     DMA_ITConfig(SCREEN_COM_TX_DMA1CHANNEL, DMA_IT_HT, DISABLE);
-//	DMA_ClearFlag(DMA1_FLAG_GL4);	                                     /*  清除状态标志                  */
-//	DMA_ITConfig(SCREEN_COM_TX_DMA1CHANNEL,DMA_IT_TC,ENABLE);	
 }
 
 /*
@@ -166,9 +162,7 @@ static void ScreenMsg_Reset (void *arg) {
     
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
-#ifdef DEBUG
-        ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
-#endif
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
         return;
     }
     tmpTxNode->msgCnt = 0;    
@@ -196,9 +190,7 @@ static void ScreenMsg_cTriChannel (void *arg) {
     
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
-#ifdef DEBUG
-        ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
-#endif
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
         return;
     }
     tmpTxNode->msgCnt = 0;
@@ -240,9 +232,7 @@ static void ScreenMsg_wTriChannel (void *arg) {
     
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
-#ifdef DEBUG
-        ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
-#endif
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
         return;
     }
     tmpTxNode->msgCnt = 0;
@@ -288,9 +278,7 @@ static void ScreenMsg_cTriDate (void *arg) {
     
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
-#ifdef DEBUG
-        ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
-#endif
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
         return;
     }
     tmpTxNode->msgCnt = 0;
@@ -332,9 +320,7 @@ static void ScreenMsg_wTriDate (void *arg) {
     tmpDate    = localtime((time_t*)&(tmpTriNode->date));
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
-#ifdef DEBUG
-        ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
-#endif
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
         return;
     }
     tmpTxNode->msgCnt = 0;
@@ -366,9 +352,7 @@ static void ScreenMsg_cTriTime (void *arg) {
 
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
-#ifdef DEBUG
-        ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
-#endif
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
         return;
     }
     tmpTxNode->msgCnt = 0;
@@ -418,9 +402,7 @@ static void ScreenMsg_wTriTime (void *arg) {
         
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
-#ifdef DEBUG
-        ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
-#endif
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
         return;
     }
     tmpTxNode->msgCnt = 0;
@@ -454,9 +436,7 @@ static void ScreenMsg_cTriDelay (void *arg) {
     
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
-#ifdef DEBUG
-        ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
-#endif
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
         return;
     }
     tmpTxNode->msgCnt = 0;
@@ -485,9 +465,7 @@ static void ScreenMsg_wTriDelay (void *arg) {
     
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
-#ifdef DEBUG
-        ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
-#endif
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
         return;
     }
     tmpTxNode->msgCnt = 0;
@@ -522,9 +500,7 @@ static void ScreenMsg_cTriRecord (void *arg) {
 
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
-#ifdef DEBUG
-        ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
-#endif
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
         return;
     }
     tmpTxNode->msgCnt = 0;
@@ -572,9 +548,7 @@ static void ScreenMsg_wTriRecord (void *arg) {
         tmpTriNode = getNodeParent(tTriDataNode, node, tmpNode);
         tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);              /*  申请一块内存                  */
         if (tmpTxNode == (tScreenTxNode*)0) {
-#ifdef DEBUG
-            ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
-#endif
+            Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
             return;
         }
         tmpTxNode->msgCnt = 0;
@@ -647,9 +621,7 @@ static void ScreenMsg_cRecord (void *arg) {
     
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
-#ifdef DEBUG
-        ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
-#endif
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
         return;
     }
     tmpTxNode->msgCnt = 0;
@@ -695,9 +667,7 @@ static void ScreenMsg_wRecord (void *arg) {
         tmpTriNode = getNodeParent(tTriDataNode, node, tmpNode);
         tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);              /*  申请一块内存                  */
         if (tmpTxNode == (tScreenTxNode*)0) {
-#ifdef DEBUG
-            ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
-#endif
+            Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
             return;
     }
         tmpTxNode->msgCnt = 0;
@@ -766,9 +736,7 @@ static void ScreenMsg_toOPTION (void *arg) {
     
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
-#ifdef DEBUG
-        ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
-#endif
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
         return;
     }
     tmpTxNode->msgCnt = 0;
@@ -795,9 +763,7 @@ static void ScreenMsg_wPO1 (void *arg) {
     
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
-#ifdef DEBUG
-        ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
-#endif
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
         return;
     }
     tmpTxNode->msgCnt = 0;
@@ -833,9 +799,7 @@ static void ScreenMsg_wPO2 (void *arg) {
     
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
-#ifdef DEBUG
-        ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
-#endif
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
         return;
     }
     tmpTxNode->msgCnt = 0;
@@ -871,9 +835,7 @@ static void ScreenMsg_wPO3 (void *arg) {
     
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
-#ifdef DEBUG
-        ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
-#endif
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
         return;
     }
     tmpTxNode->msgCnt = 0;
@@ -909,9 +871,7 @@ static void ScreenMsg_wPO4 (void *arg) {
     
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
-#ifdef DEBUG
-        ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
-#endif
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
         return;
     }
     tmpTxNode->msgCnt = 0;
@@ -947,9 +907,7 @@ static void ScreenMsg_wEO1 (void *arg) {
     
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
-#ifdef DEBUG
-        ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
-#endif
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
         return;
     }
     tmpTxNode->msgCnt = 0;
@@ -985,9 +943,7 @@ static void ScreenMsg_wEO2 (void *arg) {
     
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
-#ifdef DEBUG
-        ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
-#endif
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
         return;
     }
     tmpTxNode->msgCnt = 0;
@@ -1023,9 +979,7 @@ static void ScreenMsg_wEO3 (void *arg) {
     
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
-#ifdef DEBUG
-        ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
-#endif
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
         return;
     }
     tmpTxNode->msgCnt = 0;
@@ -1061,9 +1015,7 @@ static void ScreenMsg_wEO4 (void *arg) {
     
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
-#ifdef DEBUG
-        ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
-#endif
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
         return;
     }
     tmpTxNode->msgCnt = 0;
@@ -1099,9 +1051,7 @@ static void ScreenMsg_wEO5 (void *arg) {
     
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
-#ifdef DEBUG
-        ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
-#endif
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
         return;
     }
     tmpTxNode->msgCnt = 0;
@@ -1137,9 +1087,7 @@ static void ScreenMsg_wEO6 (void *arg) {
     
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
-#ifdef DEBUG
-        ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
-#endif
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
         return;
     }
     tmpTxNode->msgCnt = 0;
@@ -1175,9 +1123,7 @@ static void ScreenMsg_wEO7 (void *arg) {
     
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
-#ifdef DEBUG
-        ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
-#endif
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
         return;
     }
     tmpTxNode->msgCnt = 0;
@@ -1213,9 +1159,7 @@ static void ScreenMsg_wEO8 (void *arg) {
     
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
-#ifdef DEBUG
-        ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
-#endif
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
         return;
     }
     tmpTxNode->msgCnt = 0;
@@ -1253,9 +1197,7 @@ static void ScreenMsg_wSetBatch (void *arg) {
     for (uint8_t i = 0; i < 3; i++) {
         tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
         if (tmpTxNode == (tScreenTxNode*)0) {
-#ifdef DEBUG
-            ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
-#endif
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
             return;
         }
         tmpTxNode->msgCnt = 0;
@@ -1328,7 +1270,6 @@ static void ScreenMsg_wSetBatch (void *arg) {
     }
 }
 
-
 /*
     设置RTC日期
 */
@@ -1343,9 +1284,7 @@ static void  ScreenMsg_wRtc (void *arg) {
     
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
-#ifdef DEBUG
-        ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
-#endif
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
         return;
     }
     tmpTxNode->msgCnt = 0;
@@ -1380,9 +1319,7 @@ static void  ScreenMsg_rRtc (void *arg) {
     
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
-#ifdef DEBUG
-        ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
-#endif
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
         return;
     }
     tmpTxNode->msgCnt = 0;
@@ -1415,9 +1352,7 @@ static void ScreenMsg_wTriBatch (void *arg) {
     
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
-#ifdef DEBUG
-        ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
-#endif
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
         return;
     }
     tmpTxNode->msgCnt = 0;
@@ -1504,9 +1439,7 @@ static void ScreenMsg_wNrToTest (void *arg) {
     
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
-#ifdef DEBUG
-        ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
-#endif
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
         return;
     }
     tmpTxNode->msgCnt = 0;
@@ -1587,9 +1520,7 @@ static void ScreenMsg_wNrToRecord (void *arg) {
     
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
-#ifdef DEBUG
-        ShellPakaged(Red(ERROR)": %s Out of Memrmory!"endl, __func__);
-#endif
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
         return;
     }
     tmpTxNode->msgCnt = 0;
@@ -1679,9 +1610,7 @@ void ScreenReceve (void) {
             if (pScreenRxNodeB != 0) {
                 pScreenRxNodeB->msgCnt = 0;
             } else {
-#ifdef DEBUG
-                ShellPakaged(Red(ERROR)": %s Out Of Memory!"endl, __func__);
-#endif
+                Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
             }
         } else {
             
@@ -1690,9 +1619,7 @@ void ScreenReceve (void) {
             if (pScreenRxNodeA != 0) {
                 pScreenRxNodeA->msgCnt = 0;
             } else {
-#ifdef DEBUG
-                ShellPakaged(Red(ERROR)": %s Out Of Memory!"endl, __func__);
-#endif
+                Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
             }
         }
         ScreenComStateRx = ScreenComState_ReceiveIdle;                 /*  更新屏幕串口接收端状态        */
@@ -1745,10 +1672,8 @@ void ScreenProcess(void) {
             rtcDate.tm_mday = ((*pMsgIndex) >> 4) * 10 + ((*pMsgIndex) & 0x0F);
             t_time = mktime(&rtcDate);
             SpiPackaged(Mask_GPSB, t_time);
-#if DEBUG
-            ShellPakaged(Red(CONFIG)" FPGA IRIG-B Time to %#lx"endl, t_time);
-            ShellPakaged("%s"endl, asctime(&rtcDate));
-#endif
+            Debug(SCREEN_DEBUG, Red(CONFIG)" FPGA IRIG-B Time to %#lx"endl, t_time);
+            Debug(SCREEN_DEBUG, "%s"endl, asctime(&rtcDate));
             pMsgIndex += 4;
         } else if (*pMsgIndex == 0x07) {                               /*  屏幕复位                      */
             
@@ -1760,9 +1685,7 @@ void ScreenProcess(void) {
                 screenMsg.wTriDelay(0);
                 screenMsg.wTriRecord(0);
                 screenMsg.wRecord(0);                                  /*  更新缓存在 flash 中的数据     */
-#if DEBUG
-                ShellPakaged("Screen Power On."endl);
-#endif
+                Debug(SCREEN_DEBUG, "Screen Power On."endl);
             }
         } else if (screenInfo.Power && (*pMsgIndex == 0xB1)) {         /*  控件消息                      */
             
@@ -1777,9 +1700,7 @@ void ScreenProcess(void) {
                     if (((tScreenId)(*(pMsgIndex + 2)) == SPLASH) && (*(pMsgIndex + 4) == 1)) {
                         screenMsg.toOPTION(0);
                         screenInfo.ID = OPTION;
-#ifdef DEBUG
-                        ShellPakaged("Screen startup is complete."endl);
-#endif
+                        Debug(SCREEN_DEBUG, "Screen startup is complete."endl);
                     }
                     pMsgIndex += 5;
                     break;
@@ -1812,7 +1733,7 @@ void ScreenProcess(void) {
                                     }
 
                                     screenInfo.Config->po1 = outDelay;
-                                    SpiPackaged(Mask_PO1, screenInfo.Config->po1 * 2);
+                                    SpiPackaged(Mask_PO1, screenInfo.Config->po1 * CONFIG_FACTOR);
                                     break;
                                 case 0x02:                             /*  光输出2                       */
                                     if (*(pMsgIndex + 6) != 0) {
@@ -1822,7 +1743,7 @@ void ScreenProcess(void) {
                                     }
 
                                     screenInfo.Config->po2 = outDelay;
-                                    SpiPackaged(Mask_PO2, screenInfo.Config->po2 * 2);
+                                    SpiPackaged(Mask_PO2, screenInfo.Config->po2 * CONFIG_FACTOR);
                                     break;
                                 case 0x03:                             /*  光输出3                       */
                                     if (*(pMsgIndex + 6) != 0) {
@@ -1832,7 +1753,7 @@ void ScreenProcess(void) {
                                     }
 
                                     screenInfo.Config->po3 = outDelay;
-                                    SpiPackaged(Mask_PO3, screenInfo.Config->po3 * 2);
+                                    SpiPackaged(Mask_PO3, screenInfo.Config->po3 * CONFIG_FACTOR);
                                     break;
                                 case 0x04:                             /*  光输出4                       */
                                     if (*(pMsgIndex + 6) != 0) {
@@ -1842,7 +1763,7 @@ void ScreenProcess(void) {
                                     }
 
                                     screenInfo.Config->po4 = outDelay;
-                                    SpiPackaged(Mask_PO4, screenInfo.Config->po4 * 2);
+                                    SpiPackaged(Mask_PO4, screenInfo.Config->po4 * CONFIG_FACTOR);
                                     break;
                                 case 0x05:                             /*  电输出1                       */
                                     if (*(pMsgIndex + 6) != 0) {
@@ -1852,7 +1773,7 @@ void ScreenProcess(void) {
                                     }
 
                                     screenInfo.Config->eo1 = outDelay;
-                                    SpiPackaged(Mask_EO1, screenInfo.Config->eo1 * 2);
+                                    SpiPackaged(Mask_EO1, screenInfo.Config->eo1 * CONFIG_FACTOR);
                                     break;
                                 case 0x06:                             /*  电输出2                       */
                                     if (*(pMsgIndex + 6) != 0) {
@@ -1862,7 +1783,7 @@ void ScreenProcess(void) {
                                     }
 
                                     screenInfo.Config->eo2 = outDelay;
-                                    SpiPackaged(Mask_EO2, screenInfo.Config->eo2 * 2);
+                                    SpiPackaged(Mask_EO2, screenInfo.Config->eo2 * CONFIG_FACTOR);
                                     break;
                                 case 0x07:                             /*  电输出3                       */
                                     if (*(pMsgIndex + 6) != 0) {
@@ -1872,7 +1793,7 @@ void ScreenProcess(void) {
                                     }
 
                                     screenInfo.Config->eo3 = outDelay;
-                                    SpiPackaged(Mask_EO3, screenInfo.Config->eo3 * 2);
+                                    SpiPackaged(Mask_EO3, screenInfo.Config->eo3 * CONFIG_FACTOR);
                                     break;
                                 case 0x08:                             /*  电输出4                       */
                                     if (*(pMsgIndex + 6) != 0) {
@@ -1882,7 +1803,7 @@ void ScreenProcess(void) {
                                     }
 
                                     screenInfo.Config->eo4 = outDelay;
-                                    SpiPackaged(Mask_EO4, screenInfo.Config->eo4 * 2);
+                                    SpiPackaged(Mask_EO4, screenInfo.Config->eo4 * CONFIG_FACTOR);
                                     break;
                                 case 0x09:                             /*  电输出5                       */
                                     if (*(pMsgIndex + 6) != 0) {
@@ -1892,7 +1813,7 @@ void ScreenProcess(void) {
                                     }
 
                                     screenInfo.Config->eo5 = outDelay;
-                                    SpiPackaged(Mask_EO5, screenInfo.Config->eo5 * 2);
+                                    SpiPackaged(Mask_EO5, screenInfo.Config->eo5 * CONFIG_FACTOR);
                                     break;
                                 case 0x0A:                             /*  电输出6                       */
                                     if (*(pMsgIndex + 6) != 0) {
@@ -1902,7 +1823,7 @@ void ScreenProcess(void) {
                                     }
 
                                     screenInfo.Config->eo6 = outDelay;
-                                    SpiPackaged(Mask_EO6, screenInfo.Config->eo6 * 2);
+                                    SpiPackaged(Mask_EO6, screenInfo.Config->eo6 * CONFIG_FACTOR);
                                     break;
                                 case 0x0B:                             /*  电输出7                       */
                                     if (*(pMsgIndex + 6) != 0) {
@@ -1912,7 +1833,7 @@ void ScreenProcess(void) {
                                     }
 
                                     screenInfo.Config->eo7 = outDelay;
-                                    SpiPackaged(Mask_EO7, screenInfo.Config->eo7 * 2);
+                                    SpiPackaged(Mask_EO7, screenInfo.Config->eo7 * CONFIG_FACTOR);
                                     break;
                                 case 0x0C:                             /*  电输出8                       */
                                     if (*(pMsgIndex + 6) != 0) {
@@ -1922,7 +1843,7 @@ void ScreenProcess(void) {
                                     }
 
                                     screenInfo.Config->eo8 = outDelay;
-                                    SpiPackaged(Mask_EO8, screenInfo.Config->eo8 * 2);
+                                    SpiPackaged(Mask_EO8, screenInfo.Config->eo8 * CONFIG_FACTOR);
                                     break;
                                 default:
                                     break;
@@ -1939,7 +1860,7 @@ void ScreenProcess(void) {
                                     }
 
                                 screenInfo.Config->triDelay = triDelay;
-                                SpiPackaged(Mask_triDelay, screenInfo.Config->triDelay * 2);
+                                SpiPackaged(Mask_triDelay, screenInfo.Config->triDelay * CONFIG_FACTOR);
                                 FlashOperate(FlashOp_ConfigSave);
                                 pMsgIndex += 7;
                                 break;
@@ -2028,8 +1949,8 @@ void TimeoutProcess_Screen(void) {
                 screenMsg.Reset(0);                                    /*  复位屏幕                      */
                 ScreenTimer_PW = 0;
             }
-		}
-	}
+        }
+    }
 }
 
 /*
@@ -2037,17 +1958,17 @@ void TimeoutProcess_Screen(void) {
 */
 void SCREEN_COM_IRQHandler(void)
 {
-	uint16_t      tmpClearF = 0; 
-
-	if(USART_GetITStatus(SCREEN_COM,USART_IT_IDLE))                    /*  接收完成中断                  */
-	{
-		
+    uint16_t      tmpClearF = 0; 
+    
+    if(USART_GetITStatus(SCREEN_COM,USART_IT_IDLE))                    /*  接收完成中断                  */
+    {
+        
         tmpClearF  = SCREEN_COM->SR;
         tmpClearF += SCREEN_COM->DR;                                   /*  清除中断标志                  */
-		
+        
         USART_DMACmd(SCREEN_COM,USART_DMAReq_Rx,DISABLE);              /*  禁止串口接收DMA请求           */
         DMA_Cmd(SCREEN_COM_RX_DMA1CHANNEL,DISABLE);                    /*  关闭DMA接收                   */
-		
+        
         pScreenRxNodeCurr->msgCnt = SCREEN_RX_MAX_BYTE
                                   - DMA_GetCurrDataCounter(SCREEN_COM_RX_DMA1CHANNEL); 
                                                                        /*  获取接收到的长度              */
@@ -2056,42 +1977,38 @@ void SCREEN_COM_IRQHandler(void)
             if (pScreenRxNodeB != (tScreenRxNode*)0) {
                 pScreenRxNodeCurr = pScreenRxNodeB;
             } else {
-#ifdef DEBUG
-                    ShellPakaged(Red(ERROR)": Screen Receve Buffer Invalid!"endl);
-#endif
+                Debug(SCREEN_DEBUG, Red(ERROR)": Screen Receve Buffer Invalid!"endl);
             }
         } else {
             
             if (pScreenRxNodeA != (tScreenRxNode*)0) {
                 pScreenRxNodeCurr = pScreenRxNodeA;
             } else {
-#ifdef DEBUG
-                    ShellPakaged(Red(ERROR)": Screen Receve Buffer Invalid!"endl);
-#endif
+                Debug(SCREEN_DEBUG, Red(ERROR)": Screen Receve Buffer Invalid!"endl);
             }
         }
         
         ScreenComStateRx = ScreenComState_ReceiveCorrect;              /*  切换屏幕串口接收端状态        */
         
         SCREEN_COM_RX_DMA1CHANNEL->CMAR = (uint32_t)(pScreenRxNodeCurr->buff);
-		DMA_SetCurrDataCounter(SCREEN_COM_RX_DMA1CHANNEL,SCREEN_RX_MAX_BYTE);
-		DMA_Cmd(SCREEN_COM_RX_DMA1CHANNEL,ENABLE); 
-		USART_DMACmd(SCREEN_COM,USART_DMAReq_Rx,ENABLE);		       /*  更新并使能DMA控制器           */
-	}
-	
-	if(USART_GetITStatus(SCREEN_COM,USART_IT_TC))                      /*  发送完成中断                  */
-	{
-		USART_ClearITPendingBit(SCREEN_COM,USART_IT_TC);
-		
+        DMA_SetCurrDataCounter(SCREEN_COM_RX_DMA1CHANNEL,SCREEN_RX_MAX_BYTE);
+        DMA_Cmd(SCREEN_COM_RX_DMA1CHANNEL,ENABLE); 
+        USART_DMACmd(SCREEN_COM,USART_DMAReq_Rx,ENABLE);		       /*  更新并使能DMA控制器           */
+    }
+    
+    if(USART_GetITStatus(SCREEN_COM,USART_IT_TC))                      /*  发送完成中断                  */
+    {
+        USART_ClearITPendingBit(SCREEN_COM,USART_IT_TC);
+        
         USART_DMACmd(SCREEN_COM,USART_DMAReq_Tx,DISABLE);		
-		DMA_Cmd(SCREEN_COM_TX_DMA1CHANNEL,DISABLE);                    /*  关闭DMA发送                   */
+        DMA_Cmd(SCREEN_COM_TX_DMA1CHANNEL,DISABLE);                    /*  关闭DMA发送                   */
         
         memFree(&ScreenTxMem, (void*)pScreenTxNode);                   /*  释放当前发送节点              */
         pScreenTxNode = (tScreenTxNode*)0;
         
-		ScreenComStateTx = ScreenComState_TransmitWaiting;             /*  切换screen串口状态            */
-		ScreenTimer_TW   = 0;
-	}
+        ScreenComStateTx = ScreenComState_TransmitWaiting;             /*  切换screen串口状态            */
+        ScreenTimer_TW   = 0;
+    }
 }
 
 /*
@@ -2143,21 +2060,16 @@ static void ScreenStateInit (void) {
     函数功能：给屏幕供电
 */
 __STATIC_INLINE void PowerOn_Screen(void) {
-	GPIO_ResetBits(SCREEN_POWER_CTRL_PORT,SCREEN_POWER_CTRL_PIN);      /*  低电平屏幕上电                */
-#ifdef DEBUG
-    ShellPakaged("Turn On Screen Power."endl);
-#endif
+    GPIO_ResetBits(SCREEN_POWER_CTRL_PORT,SCREEN_POWER_CTRL_PIN);      /*  低电平屏幕上电                */
+    Debug(SCREEN_DEBUG, "Turn On Screen Power."endl);
 }
 
 /*
     函数功能：关闭屏幕电源
 */
-__STATIC_INLINE void PowerOff_Screen(void)
-{
-	GPIO_SetBits(SCREEN_POWER_CTRL_PORT,SCREEN_POWER_CTRL_PIN);        /*  高电平屏幕断电                */
-#ifdef DEBUG
-    ShellPakaged("Turn Off Screen Power."endl);
-#endif
+__STATIC_INLINE void PowerOff_Screen(void) {
+    GPIO_SetBits(SCREEN_POWER_CTRL_PORT,SCREEN_POWER_CTRL_PIN);        /*  高电平屏幕断电                */
+    Debug(SCREEN_DEBUG, "Turn Off Screen Power."endl);
 }
 
 /*
@@ -2165,7 +2077,7 @@ __STATIC_INLINE void PowerOff_Screen(void)
 */
 static void ShellCallback_ScreenPower (char *arg) {
     if((arg[0] != '-') || ((arg[1] != 'n') && (arg[1] != 'f'))) {      /*  参数有效性检测                */
-        ShellPakaged(ErrArgument);
+        Debug(SCREEN_DEBUG, "%s", ErrArgument);
         return;
     }
     

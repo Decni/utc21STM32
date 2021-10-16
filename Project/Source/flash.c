@@ -3,11 +3,12 @@
 #include "memory.h"
 #include "spi.h"
 #include "flash.h"
+#include "shell.h"
 
 uint8_t FlashConfig[2048]    __at(0x0807E000);                         /*  ҳ252 0x0807E000 - 0x0807E7FF */ 
 uint8_t FlashTimestamp[2048] __at(0x0807E800);                         /*  ҳ253 0x0807E800 - 0x0807EFFF */
-//uint8_t FlashConfig[2048]    __at(0x0807F000);                         /*  ҳ254 0x0807F000 - 0x0807F7FF */ 
-//uint8_t FlashTimestamp[2048] __at(0x0807F8000);                        /*  ҳ255 0x0807F800 - 0x0807FFFF */ 
+//uint8_t FlashConfig[2048]    __at(0x0807F000);                       /*  ҳ254 0x0807F000 - 0x0807F7FF */ 
+//uint8_t FlashTimestamp[2048] __at(0x0807F8000);                      /*  ҳ255 0x0807F800 - 0x0807FFFF */ 
 
 const char MemHead[4] = {'H','E','A','D'}; 
 const char MemEnd[4]  = {'E','N','D',' '};
@@ -21,7 +22,7 @@ const uint32_t* const MemEnd_Ptr  = (uint32_t *)MemEnd;
 #if 0
 __STATIC_INLINE uint16_t Flash_ReadHalfWord(uint32_t rAddress)
 {
-	return *(uint16_t *)rAddress;
+    return *(uint16_t *)rAddress;
 }
 #endif
 
@@ -30,7 +31,7 @@ __STATIC_INLINE uint16_t Flash_ReadHalfWord(uint32_t rAddress)
 */
 __STATIC_INLINE uint32_t Flash_ReadWord(uint32_t rAddress)
 {
-	return *(uint32_t *)rAddress;
+    return *(uint32_t *)rAddress;
 }
 
 /*
@@ -38,17 +39,17 @@ __STATIC_INLINE uint32_t Flash_ReadWord(uint32_t rAddress)
 */
 static bool Flash_TimestampSave(void)
 {
-	uint32_t      wAddress;
-	tTriDataNode *pDataNode;
+    uint32_t      wAddress;
+    tTriDataNode *pDataNode;
     tNode        *pNode = (tNode*)0;
     
-	if(listGetCount(TriList) <= 0) {
+    if(listGetCount(TriList) <= 0) {
         return false;
     }
     
-	FLASH_Status flashstate = FLASH_COMPLETE;
-	FLASH_Unlock();
-	FLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_PGERR | FLASH_FLAG_WRPRTERR); 
+    FLASH_Status flashstate = FLASH_COMPLETE;
+    FLASH_Unlock();
+    FLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_PGERR | FLASH_FLAG_WRPRTERR); 
 
     wAddress   = (uint32_t)FlashTimestamp;
     flashstate = FLASH_ErasePage(wAddress);
@@ -63,17 +64,14 @@ static bool Flash_TimestampSave(void)
         pNode = listGetFirst(TriList);
     }
     
-    while(pNode != (tNode*)0)
-    {
-        pDataNode = getNodeParent(tTriDataNode, node, pNode);
+    while(pNode != (tNode*)0) {
         
+        pDataNode = getNodeParent(tTriDataNode, node, pNode);
         flashstate = FLASH_ProgramWord(wAddress,pDataNode->date);
         wAddress += 4;
-        if(flashstate == FLASH_COMPLETE)
-        {
+        if(flashstate == FLASH_COMPLETE) {
             flashstate  = FLASH_ProgramWord(wAddress,pDataNode->time.data);
             wAddress   += 4;
-            
         } else {
 
             break;
@@ -86,18 +84,16 @@ static bool Flash_TimestampSave(void)
         }
     }
     
-    if(flashstate == FLASH_COMPLETE)
-    {
+    if(flashstate == FLASH_COMPLETE) {
         flashstate  = FLASH_ProgramWord(wAddress,*MemEnd_Ptr);
-        wAddress   += 4;
     }
 
-	FLASH_Lock();
+    FLASH_Lock();
     
-	if(flashstate != FLASH_COMPLETE)
-		return false;
-	else
-		return true;
+    if(flashstate != FLASH_COMPLETE)
+        return false;
+    else
+        return true;
 }
 
 /*
@@ -105,13 +101,15 @@ static bool Flash_TimestampSave(void)
 */
 static bool Flash_TimestampRead(void)
 {
-	uint32_t     rAddress,tmpWord;
-	tTriDataNode *pNode;
+    uint32_t     rAddress,tmpWord;
+    tTriDataNode *pNode;
     
     rAddress = (uint32_t)FlashTimestamp;
     tmpWord  = Flash_ReadWord(rAddress);
     
-    if(tmpWord != *MemHead_Ptr) return false;
+    if(tmpWord != *MemHead_Ptr) {
+        return false;
+    }
 
     rAddress += 4;
     tmpWord   = Flash_ReadWord(rAddress);
@@ -120,7 +118,8 @@ static bool Flash_TimestampRead(void)
     {
         pNode = (tTriDataNode*)memGet(TriMem);
         if (pNode == (tTriDataNode*)0) {
-            
+            Debug(FLASH_DEBUG, Red(ERROR)": %s Out of Memrmory!"endl, __func__);
+            return false;
         }
         pNode->date = tmpWord;
 
@@ -128,7 +127,7 @@ static bool Flash_TimestampRead(void)
         tmpWord           = Flash_ReadWord(rAddress);
         pNode->time.data  = tmpWord;
         
-        listAddLast(TriList, (tNode*)pNode);
+        listAddLast(TriList, &(pNode->node));
         
         rAddress += 4;
         tmpWord   = Flash_ReadWord(rAddress);
@@ -142,21 +141,21 @@ static bool Flash_TimestampRead(void)
 */
 static bool Flash_ConfigSave(void)
 {
-	uint32_t wAddress;
+    uint32_t wAddress;
     uint32_t *pData;
-	
-    pData    = (uint32_t*)(&Config);
-	wAddress = (uint32_t)FlashConfig;
-
-	FLASH_Status flashstate = FLASH_COMPLETE;
-	FLASH_Unlock();
-	FLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_PGERR | FLASH_FLAG_WRPRTERR); 
-	flashstate = FLASH_ErasePage(wAddress);
     
-	if(flashstate == FLASH_COMPLETE)
-	{
-		flashstate = FLASH_ProgramWord(wAddress,*MemHead_Ptr);
-	}
+    pData    = (uint32_t*)(&Config);
+    wAddress = (uint32_t)FlashConfig;
+    
+    FLASH_Status flashstate = FLASH_COMPLETE;
+    FLASH_Unlock();
+    FLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_PGERR | FLASH_FLAG_WRPRTERR); 
+    flashstate = FLASH_ErasePage(wAddress);
+    
+    if(flashstate == FLASH_COMPLETE)
+    {
+        flashstate = FLASH_ProgramWord(wAddress,*MemHead_Ptr);
+    }
     
     for (int i = sizeof(tConfig) / sizeof(uint32_t); i > 0; i--) {
         if(flashstate == FLASH_COMPLETE)
@@ -170,17 +169,17 @@ static bool Flash_ConfigSave(void)
         pData++;
     }
         
-	if(flashstate == FLASH_COMPLETE)
-	{
+    if(flashstate == FLASH_COMPLETE)
+    {
         wAddress   += 4;
-		flashstate  = FLASH_ProgramWord(wAddress,*MemEnd_Ptr);
-	}
-	FLASH_Lock();
+        flashstate  = FLASH_ProgramWord(wAddress,*MemEnd_Ptr);
+    }
+    FLASH_Lock();
     
-	if(flashstate != FLASH_COMPLETE)
-		return false;
-	else
-		return true;
+    if(flashstate != FLASH_COMPLETE)
+        return false;
+    else
+        return true;
 }
 
 /*
@@ -188,28 +187,28 @@ static bool Flash_ConfigSave(void)
 */
 static bool Flash_ConfigRead(void)
 {
-	uint32_t rAddress,tmpWord;
+    uint32_t rAddress,tmpWord;
     uint32_t *pData = (uint32_t*)&Config;
-	
-	rAddress = (uint32_t)FlashConfig;
-	tmpWord  = Flash_ReadWord(rAddress);
-	
-	if(tmpWord != *MemHead_Ptr) return false;
-
-	rAddress += 4;
-	tmpWord   = Flash_ReadWord(rAddress);
     
-	while(tmpWord != *MemEnd_Ptr)
-	{
+    rAddress = (uint32_t)FlashConfig;
+    tmpWord  = Flash_ReadWord(rAddress);
+    
+    if(tmpWord != *MemHead_Ptr) return false;
+    
+    rAddress += 4;
+    tmpWord   = Flash_ReadWord(rAddress);
+    
+    while(tmpWord != *MemEnd_Ptr)
+    {
         *pData = tmpWord;
         
-		rAddress += 4;
-		tmpWord   = Flash_ReadWord(rAddress);
+        rAddress += 4;
+        tmpWord   = Flash_ReadWord(rAddress);
         
         pData++;
-	}
-	
-	return true;
+    }
+    
+    return true;
 }
 
 /*
@@ -217,15 +216,15 @@ static bool Flash_ConfigRead(void)
 */
 static bool Flash_ErasePage(uint32_t eAddress)
 {
-	FLASH_Status flashstate = FLASH_COMPLETE;
-	FLASH_Unlock();
-	FLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_PGERR | FLASH_FLAG_WRPRTERR); 
-	flashstate = FLASH_ErasePage(eAddress);
-	FLASH_Lock();
-	if(flashstate != FLASH_COMPLETE)
-		return false;
-	else
-		return true;
+    FLASH_Status flashstate = FLASH_COMPLETE;
+    FLASH_Unlock();
+    FLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_PGERR | FLASH_FLAG_WRPRTERR); 
+    flashstate = FLASH_ErasePage(eAddress);
+    FLASH_Lock();
+    if(flashstate != FLASH_COMPLETE)
+        return false;
+    else
+        return true;
 }
 
 /*
@@ -233,32 +232,32 @@ static bool Flash_ErasePage(uint32_t eAddress)
 */
 bool FlashOperate(tFlashOperate flashoperate)
 {
-	bool flashOpState = true;
+    bool flashOpState = true;
     
-	switch(flashoperate)
-	{
-		case FlashOp_ConfigSave:
-			Flash_ConfigSave();
-			break;
+    switch(flashoperate)
+    {
+        case FlashOp_ConfigSave:
+            Flash_ConfigSave();
+            break;
         
-		case FlashOp_ConfigRead:
-			Flash_ConfigRead();
-			break;
-
-		case FlashOp_TimestampSave:
-			Flash_TimestampSave();
-			break;
+        case FlashOp_ConfigRead:
+            Flash_ConfigRead();
+            break;
+    
+        case FlashOp_TimestampSave:
+            Flash_TimestampSave();
+            break;
         
-		case FlashOp_TimestampRead:
-			Flash_TimestampRead();
-			break;
+        case FlashOp_TimestampRead:
+            Flash_TimestampRead();
+            break;
         
-		case FlashOp_TimestampEraser:
-			Flash_ErasePage((uint32_t)FlashTimestamp);
-			break;
+        case FlashOp_TimestampEraser:
+            Flash_ErasePage((uint32_t)FlashTimestamp);
+            break;
         
-		default:
-			break;
-	}
-	return flashOpState;
+        default:
+            break;
+    }
+    return flashOpState;
 }
