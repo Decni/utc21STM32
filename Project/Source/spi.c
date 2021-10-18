@@ -44,6 +44,7 @@ tSpiTxNode *pSpiTxNode;                                                /*  spi收
 tSpiState   SpiState;                                                  /*  spi当前的状态                 */
 
 uint16_t   SpiTimer_rFPGA = 0;                                         /*  上电500ms复位FPGA             */
+uint16_t   SpiTimer_sRecord = 0;                                       /*  */
 tFpgaState FPGA_State;
 
 static void DMA_Config_SPI (void);
@@ -216,7 +217,7 @@ static void ConfigSPI_Rx(void) {
 void SpiReceve (void) {
     uint16_t tSPIDR = 0;
     
-    if ((FPGA_State == FPGA_RESET)
+    if ((FPGA_State != FPGA_UNKNOW)
         && (SpiState == SPI_IDLE) 
         && GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_3)
         && screenInfo.TriMode == Mode_SyncTri) {
@@ -243,11 +244,12 @@ void SpiReceve (void) {
         NotifyFPGA(Mode_Transmit);
         listAddFirst(&SpiRxList, &(pSpiRxNode->node));
         Debug(SPI_DEBUG, "Receve Ok. %#llx"endl, *((uint64_t*)&(pSpiRxNode->buff)));
-        pSpiRxNode = (tSpiRxNode*)0;        
-        FlashOperate(FlashOp_TimestampSave);                           /*  保存时间戳                    */
+        pSpiRxNode = (tSpiRxNode*)0;
+        SpiTimer_sRecord = 0;
+        FPGA_State = FPGA_TRIG;
         screenMsg.wTriBatch(0);
-        screenMsg.wNrToTest(0);
-        screenMsg.wNrToRecord(0);                                      /*  刷新屏幕                      */
+//        screenMsg.wNrToTest(0);
+//        screenMsg.wNrToRecord(0);                                      /*  刷新屏幕                      */
 
         SpiState = SPI_IDLE;
     }
@@ -258,12 +260,8 @@ void SpiReceve (void) {
 */
 void SpiTransmit (void) {
     tNode *tmpNode;
-    
-    if (listGetCount(&SpiTxList) <= 0) {
-        return;
-    }
-    
-    if ((FPGA_State == FPGA_RESET) && (SpiState == SPI_IDLE)) {
+
+    if ((FPGA_State != FPGA_UNKNOW) && (SpiState == SPI_IDLE) && (listGetCount(&SpiTxList) > 0)) {
         tmpNode = listRemoveFirst(&SpiTxList);
         if (tmpNode == (tNode*)0) {
             return;
@@ -446,25 +444,31 @@ void NotifyFPGA(tMode mode) {
     定时器回调函数
 */
 void TimerProcess_SPI(void) {
-    if (FPGA_State != FPGA_UNKNOW) {
-        return;
+    if (FPGA_State == FPGA_UNKNOW) {
+        if (SpiTimer_rFPGA++ == RST_FPGA_WAITING) {
+            NotifyFPGA(Mode_Reset);
+            SpiPackaged(Mask_PO1, Config.po1 * CONFIG_FACTOR);
+            SpiPackaged(Mask_PO2, Config.po2 * CONFIG_FACTOR);
+            SpiPackaged(Mask_PO3, Config.po3 * CONFIG_FACTOR);
+            SpiPackaged(Mask_PO4, Config.po4 * CONFIG_FACTOR);
+            SpiPackaged(Mask_EO1, Config.eo1 * CONFIG_FACTOR);
+            SpiPackaged(Mask_EO2, Config.eo2 * CONFIG_FACTOR);
+            SpiPackaged(Mask_EO3, Config.eo3 * CONFIG_FACTOR);
+            SpiPackaged(Mask_EO4, Config.eo4 * CONFIG_FACTOR);
+            SpiPackaged(Mask_EO5, Config.eo5 * CONFIG_FACTOR);
+            SpiPackaged(Mask_EO6, Config.eo6 * CONFIG_FACTOR);
+            SpiPackaged(Mask_EO7, Config.eo7 * CONFIG_FACTOR);
+            SpiPackaged(Mask_EO8, Config.eo8 * CONFIG_FACTOR);
+            SpiPackaged(Mask_triDelay, Config.triDelay * CONFIG_FACTOR);
+            FPGA_State = FPGA_RESET;
+        }
     }
-    if (SpiTimer_rFPGA++ == RST_FPGA_WAITING) {
-        NotifyFPGA(Mode_Reset);
-        SpiPackaged(Mask_PO1, Config.po1 * CONFIG_FACTOR);
-        SpiPackaged(Mask_PO2, Config.po2 * CONFIG_FACTOR);
-        SpiPackaged(Mask_PO3, Config.po3 * CONFIG_FACTOR);
-        SpiPackaged(Mask_PO4, Config.po4 * CONFIG_FACTOR);
-        SpiPackaged(Mask_EO1, Config.eo1 * CONFIG_FACTOR);
-        SpiPackaged(Mask_EO2, Config.eo2 * CONFIG_FACTOR);
-        SpiPackaged(Mask_EO3, Config.eo3 * CONFIG_FACTOR);
-        SpiPackaged(Mask_EO4, Config.eo4 * CONFIG_FACTOR);
-        SpiPackaged(Mask_EO5, Config.eo5 * CONFIG_FACTOR);
-        SpiPackaged(Mask_EO6, Config.eo6 * CONFIG_FACTOR);
-        SpiPackaged(Mask_EO7, Config.eo7 * CONFIG_FACTOR);
-        SpiPackaged(Mask_EO8, Config.eo8 * CONFIG_FACTOR);
-        SpiPackaged(Mask_triDelay, Config.triDelay * CONFIG_FACTOR);
-        FPGA_State = FPGA_RESET;
+    
+    if (FPGA_State == FPGA_TRIG) {
+        if (SpiTimer_sRecord++ == SAVE_TRIG_RECORD) {
+            FlashOperate(FlashOp_TimestampSave);                       /*  保存时间戳                    */
+            FPGA_State = FPGA_WORK;
+        }
     }
 }
 
@@ -494,7 +498,7 @@ static void ShellCallback_GetRecord(char* arg) {
         }
     }
     
-    Debug(SPI_DEBUG, "%s", RecordHead);
+    ShellPakaged("%s", RecordHead);
     tmpNode = listGetFirst(TriList);
     if (tmpNode == (tNode*)0) {
         return;
@@ -512,7 +516,7 @@ static void ShellCallback_GetRecord(char* arg) {
         
         if (tmpTriNode->time.item.num > 3) {                           /*  通道号                        */
             tmpBuff[tmpIndex++]   = 'P';
-            tmpBuff[tmpIndex + 1] = '0' + tmpTriNode->time.item.num % 3;
+            tmpBuff[tmpIndex + 1] = '0' + tmpTriNode->time.item.num % 4;
         } else if (tmpTriNode->time.item.num > 0) {
         
             tmpBuff[tmpIndex++]   = 'E';
@@ -532,7 +536,7 @@ static void ShellCallback_GetRecord(char* arg) {
                                     tmpMs, tmpUs, tmpNs);              /*  时间戳                        */
         tmpBuff[tmpIndex] = '\0';
 
-        Debug(SPI_DEBUG, "%s", tmpBuff);
+        ShellPakaged("%s", tmpBuff);
         
         tmpNode = listGetNext(TriList, tmpNode);
         if (tmpNode == (tNode*)0) {
@@ -558,7 +562,7 @@ static void ShellCallback_OutDelay(char *arg) {
     
     tmpStart = (uint32_t*)&Config;
     if (arg == NULL) {                                                 /*  显示所有通道延迟值            */
-        Debug(SPI_DEBUG, "%s", DelayHead);
+        ShellPakaged("%s", DelayHead);
         
         for (uint8_t i =0; i < 11; i++) {
             tmpIndex   = sprintf(tmpBuff, "   %2u       \033[34;1m", i + 1);
@@ -577,7 +581,7 @@ static void ShellCallback_OutDelay(char *arg) {
                                                 *tmpStart / 100, *tmpStart % 100);                    
             tmpBuff[tmpIndex] = '\0';
             
-            Debug(SPI_DEBUG, "%s", tmpBuff);
+            ShellPakaged("%s", tmpBuff);
             tmpStart++;
         }
     } else {                                                           /*  设置指定通道延迟值            */
@@ -656,7 +660,7 @@ static void ShellCallback_DelayTri(char *arg) {
     uint32_t    tmpValue;
     
     if (arg == NULL) {
-        Debug(SPI_DEBUG, Blue(Delay Trigger:)" %7u.%.2u(us)"endl,
+        ShellPakaged(Blue(Delay Trigger:)" %7u.%.2u(us)"endl,
                      Config.triDelay / 100, Config.triDelay % 100);
     } else {
         if((arg[0] != '-') || (arg[1] != 'p')) {                       /*  参数有效性检测                */

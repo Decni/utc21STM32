@@ -20,8 +20,7 @@ const uint32_t* const MemEnd_Ptr  = (uint32_t *)MemEnd;
     从flash中读取半个字（2Byte）
 */
 #if 0
-__STATIC_INLINE uint16_t Flash_ReadHalfWord(uint32_t rAddress)
-{
+__STATIC_INLINE uint16_t Flash_ReadHalfWord(uint32_t rAddress) {
     return *(uint16_t *)rAddress;
 }
 #endif
@@ -29,16 +28,14 @@ __STATIC_INLINE uint16_t Flash_ReadHalfWord(uint32_t rAddress)
 /*
     从flash中读取一个字（4Byte）
 */
-__STATIC_INLINE uint32_t Flash_ReadWord(uint32_t rAddress)
-{
+__STATIC_INLINE uint32_t Flash_ReadWord(uint32_t rAddress) {
     return *(uint32_t *)rAddress;
 }
 
 /*
     将链表中存储的时间戳保存到flash中
 */
-static bool Flash_TimestampSave(void)
-{
+static bool Flash_TimestampSave(void) {
     uint32_t      wAddress;
     tTriDataNode *pDataNode;
     tNode        *pNode = (tNode*)0;
@@ -54,8 +51,7 @@ static bool Flash_TimestampSave(void)
     wAddress   = (uint32_t)FlashTimestamp;
     flashstate = FLASH_ErasePage(wAddress);
     
-    if(flashstate == FLASH_COMPLETE)
-    {
+    if(flashstate == FLASH_COMPLETE) {
         flashstate  = FLASH_ProgramWord(wAddress,*MemHead_Ptr);
         wAddress   += 4;
     }
@@ -99,8 +95,7 @@ static bool Flash_TimestampSave(void)
 /*
     读取保存在flash中的时间戳，存储到链表中
 */
-static bool Flash_TimestampRead(void)
-{
+static bool Flash_TimestampRead(void) {
     uint32_t     rAddress,tmpWord;
     tTriDataNode *pNode;
     
@@ -114,8 +109,7 @@ static bool Flash_TimestampRead(void)
     rAddress += 4;
     tmpWord   = Flash_ReadWord(rAddress);
     
-    while(tmpWord != *MemEnd_Ptr)
-    {
+    while(tmpWord != *MemEnd_Ptr) {
         pNode = (tTriDataNode*)memGet(TriMem);
         if (pNode == (tTriDataNode*)0) {
             Debug(FLASH_DEBUG, Red(ERROR)": %s Out of Memrmory!"endl, __func__);
@@ -139,8 +133,7 @@ static bool Flash_TimestampRead(void)
 /*
     将设置参数保存到flash中
 */
-static bool Flash_ConfigSave(void)
-{
+static bool Flash_ConfigSave(void) {
     uint32_t wAddress;
     uint32_t *pData;
     
@@ -152,14 +145,12 @@ static bool Flash_ConfigSave(void)
     FLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_PGERR | FLASH_FLAG_WRPRTERR); 
     flashstate = FLASH_ErasePage(wAddress);
     
-    if(flashstate == FLASH_COMPLETE)
-    {
+    if(flashstate == FLASH_COMPLETE) {
         flashstate = FLASH_ProgramWord(wAddress,*MemHead_Ptr);
     }
     
     for (int i = sizeof(tConfig) / sizeof(uint32_t); i > 0; i--) {
-        if(flashstate == FLASH_COMPLETE)
-        {
+        if(flashstate == FLASH_COMPLETE) {
             wAddress   += 4;
             flashstate  = FLASH_ProgramWord(wAddress,*pData);
         } else {
@@ -169,8 +160,7 @@ static bool Flash_ConfigSave(void)
         pData++;
     }
         
-    if(flashstate == FLASH_COMPLETE)
-    {
+    if(flashstate == FLASH_COMPLETE) {
         wAddress   += 4;
         flashstate  = FLASH_ProgramWord(wAddress,*MemEnd_Ptr);
     }
@@ -185,8 +175,7 @@ static bool Flash_ConfigSave(void)
 /*
     读取保存在flash中的设置参数
 */
-static bool Flash_ConfigRead(void)
-{
+static bool Flash_ConfigRead(void) {
     uint32_t rAddress,tmpWord;
     uint32_t *pData = (uint32_t*)&Config;
     
@@ -198,8 +187,7 @@ static bool Flash_ConfigRead(void)
     rAddress += 4;
     tmpWord   = Flash_ReadWord(rAddress);
     
-    while(tmpWord != *MemEnd_Ptr)
-    {
+    while(tmpWord != *MemEnd_Ptr) {
         *pData = tmpWord;
         
         rAddress += 4;
@@ -214,8 +202,7 @@ static bool Flash_ConfigRead(void)
 /*
 函数功能：擦除指定的Flash页
 */
-static bool Flash_ErasePage(uint32_t eAddress)
-{
+static bool Flash_ErasePage(uint32_t eAddress) {
     FLASH_Status flashstate = FLASH_COMPLETE;
     FLASH_Unlock();
     FLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_PGERR | FLASH_FLAG_WRPRTERR); 
@@ -230,12 +217,10 @@ static bool Flash_ErasePage(uint32_t eAddress)
 /*
     完成指定的flash操作
 */
-bool FlashOperate(tFlashOperate flashoperate)
-{
+bool FlashOperate(tFlashOperate flashoperate) {
     bool flashOpState = true;
     
-    switch(flashoperate)
-    {
+    switch(flashoperate) {
         case FlashOp_ConfigSave:
             Flash_ConfigSave();
             break;

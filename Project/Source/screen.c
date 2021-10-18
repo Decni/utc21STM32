@@ -247,7 +247,7 @@ static void ScreenMsg_wTriChannel (void *arg) {
 
     if (tmpTriNode->time.item.num > 3) {
         tmpTxNode->buff[tmpTxNode->msgCnt++]   = 'P';
-        tmpTxNode->buff[tmpTxNode->msgCnt + 1] = '0' + tmpTriNode->time.item.num % 3;
+        tmpTxNode->buff[tmpTxNode->msgCnt + 1] = '0' + tmpTriNode->time.item.num % 4;
     } else if (tmpTriNode->time.item.num > 0) {
         
         tmpTxNode->buff[tmpTxNode->msgCnt++]   = 'E';
@@ -572,7 +572,7 @@ static void ScreenMsg_wTriRecord (void *arg) {
         
         if (tmpTriNode->time.item.num > 3) {
             tmpTxNode->buff[tmpTxNode->msgCnt++]   = 'P';
-            tmpTxNode->buff[tmpTxNode->msgCnt + 1] = '0' + tmpTriNode->time.item.num % 3;
+            tmpTxNode->buff[tmpTxNode->msgCnt + 1] = '0' + tmpTriNode->time.item.num % 4;
         } else if (tmpTriNode->time.item.num > 0) {
         
             tmpTxNode->buff[tmpTxNode->msgCnt++]   = 'E';
@@ -598,7 +598,7 @@ static void ScreenMsg_wTriRecord (void *arg) {
         tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFF;
         tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFF;
         
-        listAddLast(&ScreenTxList, &(tmpTxNode->node));
+        listAddFirst(&ScreenTxList, &(tmpTxNode->node));
         
         if (i == 4) {
             break;
@@ -691,7 +691,7 @@ static void ScreenMsg_wRecord (void *arg) {
 
         if (tmpTriNode->time.item.num > 3) {
             tmpTxNode->buff[tmpTxNode->msgCnt++]   = 'P';
-            tmpTxNode->buff[tmpTxNode->msgCnt + 1] = '0' + tmpTriNode->time.item.num % 3;
+            tmpTxNode->buff[tmpTxNode->msgCnt + 1] = '0' + tmpTriNode->time.item.num % 4;
         } else if (tmpTriNode->time.item.num > 0) {
 
             tmpTxNode->buff[tmpTxNode->msgCnt++]   = 'E';
@@ -1350,6 +1350,10 @@ static void ScreenMsg_wTriBatch (void *arg) {
     }
     tmpTriNode = getNodeParent(tTriDataNode, node, pNode);
     
+    if (listGetCount(&ScreenTxList) >= SCREEN_TX_MAX_ITEM) {
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
+        return;
+    }
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
         Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
@@ -1375,7 +1379,7 @@ static void ScreenMsg_wTriBatch (void *arg) {
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x03;
     if (tmpTriNode->time.item.num > 3) {
         tmpTxNode->buff[tmpTxNode->msgCnt++]   = 'P';
-        tmpTxNode->buff[tmpTxNode->msgCnt + 1] = '0' + tmpTriNode->time.item.num % 3;
+        tmpTxNode->buff[tmpTxNode->msgCnt + 1] = '0' + tmpTriNode->time.item.num % 4;
     } else if (tmpTriNode->time.item.num > 0) {
     
         tmpTxNode->buff[tmpTxNode->msgCnt++]   = 'E';
@@ -1410,7 +1414,7 @@ static void ScreenMsg_wTriBatch (void *arg) {
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFF;
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFF;
     
-    listAddFirst(&ScreenTxList, &(tmpTxNode->node));
+    listAddLast(&ScreenTxList, &(tmpTxNode->node));
     tmpTxNode = (tScreenTxNode*)0;
 }
 
@@ -1437,6 +1441,11 @@ static void ScreenMsg_wNrToTest (void *arg) {
     
     tmpTriNode = getNodeParent(tTriDataNode, node, tmpNode);           /*  获取触发节点                  */
     
+    if (listGetCount(&ScreenTxList) >= SCREEN_TX_MAX_ITEM) {
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
+        return;
+    }
+        
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
         Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
@@ -1463,7 +1472,7 @@ static void ScreenMsg_wNrToTest (void *arg) {
     
     if (tmpTriNode->time.item.num > 3) {
         tmpTxNode->buff[tmpTxNode->msgCnt++]   = 'P';
-        tmpTxNode->buff[tmpTxNode->msgCnt + 1] = '0' + tmpTriNode->time.item.num % 3;
+        tmpTxNode->buff[tmpTxNode->msgCnt + 1] = '0' + tmpTriNode->time.item.num % 4;
     } else if (tmpTriNode->time.item.num > 0) {
     
         tmpTxNode->buff[tmpTxNode->msgCnt++]   = 'E';
@@ -1518,6 +1527,11 @@ static void ScreenMsg_wNrToRecord (void *arg) {
     
     tmpTriNode = getNodeParent(tTriDataNode, node, tmpNode);           /*  获取触发节点                  */
     
+    if (listGetCount(&ScreenTxList) >= SCREEN_TX_MAX_ITEM) {
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
+        return;
+    }
+    
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
     if (tmpTxNode == (tScreenTxNode*)0) {
         Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
@@ -1544,7 +1558,7 @@ static void ScreenMsg_wNrToRecord (void *arg) {
     
     if (tmpTriNode->time.item.num > 3) {
         tmpTxNode->buff[tmpTxNode->msgCnt++]   = 'P';
-        tmpTxNode->buff[tmpTxNode->msgCnt + 1] = '0' + tmpTriNode->time.item.num % 3;
+        tmpTxNode->buff[tmpTxNode->msgCnt + 1] = '0' + tmpTriNode->time.item.num % 4;
     } else if (tmpTriNode->time.item.num > 0) {
     
         tmpTxNode->buff[tmpTxNode->msgCnt++]   = 'E';
@@ -1673,7 +1687,7 @@ void ScreenProcess(void) {
             t_time = mktime(&rtcDate);
             SpiPackaged(Mask_GPSB, t_time);
             Debug(SCREEN_DEBUG, Red(CONFIG)" FPGA IRIG-B Time to %#lx"endl, t_time);
-            Debug(SCREEN_DEBUG, "%s"endl, asctime(&rtcDate));
+            Debug(SCREEN_DEBUG, "Now: %s"endl, asctime(&rtcDate));
             pMsgIndex += 4;
         } else if (*pMsgIndex == 0x07) {                               /*  屏幕复位                      */
             

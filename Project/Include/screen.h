@@ -6,7 +6,7 @@
 #include <stdbool.h>
 
 #define SCREEN_TX_MAX_BYTE    64
-#define SCREEN_TX_MAX_ITEM    32
+#define SCREEN_TX_MAX_ITEM    72
 #define SCREEN_RX_MAX_BYTE    28
 #define SCREEN_RX_MAX_ITEM    4
  

@@ -63,23 +63,16 @@ void* memGet(tMemory* mem) {
     }
     
     tmpCnt = listGetCount(&(mem->blockList));
-    if (tmpCnt < 0) {
+    if (tmpCnt <= 0) {
         return memory;
     }
     
-    if (tmpCnt > 0) {
-        memory = (void*)listRemoveFirst(&(mem->blockList));
-        tmpCnt = listGetCount(&(mem->blockList));
-        if (mem->minCount > tmpCnt) {
-            mem->minCount = tmpCnt;
-        }
-#ifdef DEBUG        
-    } else if (strcmp(mem->name, "ShellTxMem")) {
-    
-        ShellPakaged(Red(ERROR:)" %s: Out of memory!"endl, mem->name);
-#endif    
+    memory = (void*)listRemoveFirst(&(mem->blockList));
+    tmpCnt = listGetCount(&(mem->blockList));
+    if (mem->minCount > tmpCnt) {
+        mem->minCount = tmpCnt;
     }
-    
+
     return memory;
 }
 

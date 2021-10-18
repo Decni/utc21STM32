@@ -9,6 +9,7 @@
 #define SPI_RX_MAX_BYTE       8
 #define SPI_RX_MAX_ITEM      20
 
+#define SAVE_TRIG_RECORD   3000                                        /*  触发 3s 后保存数据到 flash    */
 #define RST_FPGA_WAITING   5000                                        /*  u16 上电 500ms 复位 fpga      */
 #define FPGA_CNT_UNITS_ns     5                                        /*  FPGA 计数器单位为 5 ns        */
 #define HUMEN_SET_UNITS_ns   10                                        /*  设置步进量为 10 ns            */
@@ -98,6 +99,7 @@ typedef enum _fpgaState {
     FPGA_RESET,
     FPGA_TIMEINIT,
     FPGA_WORK,
+    FPGA_TRIG,
 }tFpgaState;
 
 extern tList     *TriList;
