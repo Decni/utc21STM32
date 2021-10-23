@@ -669,7 +669,7 @@ static void ScreenMsg_wRecord (void *arg) {
         if (tmpTxNode == (tScreenTxNode*)0) {
             Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
             return;
-    }
+        }
         tmpTxNode->msgCnt = 0;
         
         tmpDate    = localtime((time_t*)&(tmpTriNode->date));
@@ -717,7 +717,15 @@ static void ScreenMsg_wRecord (void *arg) {
         tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFF;
         tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFF;
 
-        listAddLast(&ScreenTxList, &(tmpTxNode->node));
+        if (arg != (void*)0) {
+            listAddFirst(&ScreenTxList, &(tmpTxNode->node));
+            if (i == *(uint32_t*)arg) {
+                break;
+            }
+        } else {
+            
+            listAddLast(&ScreenTxList, &(tmpTxNode->node));
+        }
 
         tmpNode = listGetNext(TriList, tmpNode);
         if (tmpNode == (tNode*)0) {
@@ -1414,7 +1422,7 @@ static void ScreenMsg_wTriBatch (void *arg) {
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFF;
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFF;
     
-    listAddLast(&ScreenTxList, &(tmpTxNode->node));
+    listAddFirst(&ScreenTxList, &(tmpTxNode->node));
     tmpTxNode = (tScreenTxNode*)0;
 }
 
@@ -1904,6 +1912,10 @@ void ScreenProcess(void) {
                                         NotifyFPGA(Mode_SyncTri);
                                     } else {
                                         NotifyFPGA(Mode_DelayTri);
+                                        if (SpiTimer_tCount > 0) {
+                                            screenMsg.wRecord(&SpiTimer_tCount);
+                                            SpiTimer_tCount = 0;
+                                        }
                                     }
                                     break;
                                 

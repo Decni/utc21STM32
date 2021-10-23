@@ -9,8 +9,10 @@
 #define SPI_RX_MAX_BYTE       8
 #define SPI_RX_MAX_ITEM      20
 
-#define SAVE_TRIG_RECORD   3000                                        /*  触发 3s 后保存数据到 flash    */
+#define SAVE_RECORD_TIME  25000                                        /*  触发 2.5s 后保存数据到 flash  */
+#define FLUSH_SCREEN_TIME  2100                                        /*  触发后 210ms 刷新屏幕         */
 #define RST_FPGA_WAITING   5000                                        /*  u16 上电 500ms 复位 fpga      */
+
 #define FPGA_CNT_UNITS_ns     5                                        /*  FPGA 计数器单位为 5 ns        */
 #define HUMEN_SET_UNITS_ns   10                                        /*  设置步进量为 10 ns            */
 #define CONFIG_FACTOR       (HUMEN_SET_UNITS_ns / FPGA_CNT_UNITS_ns)
@@ -100,12 +102,14 @@ typedef enum _fpgaState {
     FPGA_TIMEINIT,
     FPGA_WORK,
     FPGA_TRIG,
+    FPGA_TRIG_DONE,
 }tFpgaState;
 
 extern tList     *TriList;
 extern tMemory   *TriMem;
 extern tConfig    Config;
 extern tFpgaState FPGA_State;
+extern uint32_t   SpiTimer_tCount;
 
 void ComInit_SPI(void);                                                /*  SPI初始化函数                 */
 void SpiReceve (void);                                                 /*  SPI接收函数                   */

@@ -43,8 +43,10 @@ tSpiRxNode *pSpiRxNode;
 tSpiTxNode *pSpiTxNode;                                                /*  spi收发节点指针               */
 tSpiState   SpiState;                                                  /*  spi当前的状态                 */
 
-uint16_t   SpiTimer_rFPGA = 0;                                         /*  上电500ms复位FPGA             */
-uint16_t   SpiTimer_sRecord = 0;                                       /*  */
+uint16_t   SpiTimer_rFPGA   = 0;                                       /*  上电500ms复位FPGA             */
+uint16_t   SpiTimer_sRecord = 0;                                       /*  触发后 3s 保存数据到 flash    */
+uint16_t   SpiTimer_fScreen = 0;                                       /*  触发后 210ms 刷新屏幕         */
+uint32_t   SpiTimer_tCount  = 0;                                       /*  记录同步触发的次数            */
 tFpgaState FPGA_State;
 
 static void DMA_Config_SPI (void);
@@ -245,13 +247,13 @@ void SpiReceve (void) {
         listAddFirst(&SpiRxList, &(pSpiRxNode->node));
         Debug(SPI_DEBUG, "Receve Ok. %#llx"endl, *((uint64_t*)&(pSpiRxNode->buff)));
         pSpiRxNode = (tSpiRxNode*)0;
-        SpiTimer_sRecord = 0;
+        
+        if (SpiTimer_tCount < SPI_RX_MAX_ITEM) {
+            SpiTimer_tCount++;
+        }
+        SpiTimer_fScreen = 0;
         FPGA_State = FPGA_TRIG;
-        screenMsg.wTriBatch(0);
-//        screenMsg.wNrToTest(0);
-//        screenMsg.wNrToRecord(0);                                      /*  刷新屏幕                      */
-
-        SpiState = SPI_IDLE;
+        SpiState   = SPI_IDLE;
     }
 }
 
@@ -445,7 +447,7 @@ void NotifyFPGA(tMode mode) {
 */
 void TimerProcess_SPI(void) {
     if (FPGA_State == FPGA_UNKNOW) {
-        if (SpiTimer_rFPGA++ == RST_FPGA_WAITING) {
+        if (SpiTimer_rFPGA++ >= RST_FPGA_WAITING) {
             NotifyFPGA(Mode_Reset);
             SpiPackaged(Mask_PO1, Config.po1 * CONFIG_FACTOR);
             SpiPackaged(Mask_PO2, Config.po2 * CONFIG_FACTOR);
@@ -465,7 +467,16 @@ void TimerProcess_SPI(void) {
     }
     
     if (FPGA_State == FPGA_TRIG) {
-        if (SpiTimer_sRecord++ == SAVE_TRIG_RECORD) {
+        if (SpiTimer_fScreen++ >= FLUSH_SCREEN_TIME) {
+            screenMsg.wTriRecord(0);
+            screenMsg.wTriBatch(0);
+            SpiTimer_sRecord = 0;
+            FPGA_State = FPGA_TRIG_DONE;
+        }
+    }
+    
+    if (FPGA_State == FPGA_TRIG_DONE) {
+        if (SpiTimer_sRecord++ >= SAVE_RECORD_TIME) {
             FlashOperate(FlashOp_TimestampSave);                       /*  保存时间戳                    */
             FPGA_State = FPGA_WORK;
         }
