@@ -109,7 +109,7 @@ extern tList     *TriList;
 extern tMemory   *TriMem;
 extern tConfig    Config;
 extern tFpgaState FPGA_State;
-extern uint32_t   SpiTimer_tCount;
+extern uint32_t   SpiTimer_tCntR;
 
 void ComInit_SPI(void);                                                /*  SPI初始化函数                 */
 void SpiReceve (void);                                                 /*  SPI接收函数                   */

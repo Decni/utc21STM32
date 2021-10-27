@@ -12,7 +12,7 @@
  
 #define TX_WAITING_TIME       1000                                     /*  u16 两条指令间隔 100ms        */
 #define POWER_WAITING_TIME    1000                                     /*  u16 100ms                     */
-#define POWER_RESET_TIME      10000                                    /*  u16 1s                        */
+#define POWER_RESET_TIME      30000                                    /*  u16 3s                        */
 
 typedef struct _screenTxNode {
     tNode   node;
@@ -61,15 +61,17 @@ typedef struct _screenMsg {
     pvFun wTriBatch;
     pvFun wNrToTest;
     pvFun wNrToRecord;
+    pvFun wLock;
+    pvFun wCtrl;
 }tScreenMsg;
 
 
 typedef enum {
-	ScreenComState_TransmitIdle = 1,  //发送空闲
-	ScreenComState_Transmitting,      //正在发送
-	ScreenComState_TransmitWaiting,   //发送完成，两条指令要有间隔
-	ScreenComState_ReceiveIdle,       //接收空闲
-	ScreenComState_ReceiveCorrect     //正确接收
+    ScreenComState_TransmitIdle = 1,                                   /*  发送空闲                      */
+    ScreenComState_Transmitting,                                       /*  正在发送                      */
+    ScreenComState_TransmitWaiting,                                    /*  发送完成，两条指令要有间隔    */
+    ScreenComState_ReceiveIdle,                                        /*  接收空闲                      */
+    ScreenComState_ReceiveCorrect                                      /*  正确接收                      */
 }tScreenComState;
 
 typedef enum _screenId {

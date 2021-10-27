@@ -46,7 +46,8 @@ tSpiState   SpiState;                                                  /*  spi当
 uint16_t   SpiTimer_rFPGA   = 0;                                       /*  上电500ms复位FPGA             */
 uint16_t   SpiTimer_sRecord = 0;                                       /*  触发后 3s 保存数据到 flash    */
 uint16_t   SpiTimer_fScreen = 0;                                       /*  触发后 210ms 刷新屏幕         */
-uint32_t   SpiTimer_tCount  = 0;                                       /*  记录同步触发的次数            */
+uint32_t   SpiTimer_tCntR   = 0;                                       /*  记录同步触发的次数            */
+uint32_t   SpiTimer_tCntT   = 0;
 tFpgaState FPGA_State;
 
 static void DMA_Config_SPI (void);
@@ -99,7 +100,7 @@ static void ShellCallback_ResetFPGA (char *arg);
     SPI_InitStructure.SPI_CPOL              = SPI_CPOL_High; 
     SPI_InitStructure.SPI_CPHA              = SPI_CPHA_2Edge;
     SPI_InitStructure.SPI_NSS               = SPI_NSS_Soft;
-    SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_128;
+    SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_2;
     SPI_InitStructure.SPI_FirstBit          = SPI_FirstBit_LSB;
     SPI_InitStructure.SPI_CRCPolynomial     = 7;
     SPI_Init(SPI2, &SPI_InitStructure);                                /*  SPI基本配置                   */
@@ -219,7 +220,7 @@ static void ConfigSPI_Rx(void) {
 void SpiReceve (void) {
     uint16_t tSPIDR = 0;
     
-    if ((FPGA_State != FPGA_UNKNOW)
+    if ((FPGA_State >= FPGA_WORK)
         && (SpiState == SPI_IDLE) 
         && GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_3)
         && screenInfo.TriMode == Mode_SyncTri) {
@@ -248,12 +249,17 @@ void SpiReceve (void) {
         Debug(SPI_DEBUG, "Receve Ok. %#llx"endl, *((uint64_t*)&(pSpiRxNode->buff)));
         pSpiRxNode = (tSpiRxNode*)0;
         
-        if (SpiTimer_tCount < SPI_RX_MAX_ITEM) {
-            SpiTimer_tCount++;
+        if (SpiTimer_tCntR < SPI_RX_MAX_ITEM) {
+            SpiTimer_tCntR++;
         }
+        
+        if (SpiTimer_tCntT < SPI_RX_MAX_ITEM) {
+            SpiTimer_tCntT++;
+        }
+        
         SpiTimer_fScreen = 0;
-        FPGA_State = FPGA_TRIG;
-        SpiState   = SPI_IDLE;
+        FPGA_State       = FPGA_TRIG;
+        SpiState         = SPI_IDLE;
     }
 }
 
@@ -263,7 +269,7 @@ void SpiReceve (void) {
 void SpiTransmit (void) {
     tNode *tmpNode;
 
-    if ((FPGA_State != FPGA_UNKNOW) && (SpiState == SPI_IDLE) && (listGetCount(&SpiTxList) > 0)) {
+    if ((FPGA_State >= FPGA_WORK) && (SpiState == SPI_IDLE) && (listGetCount(&SpiTxList) > 0)) {
         tmpNode = listRemoveFirst(&SpiTxList);
         if (tmpNode == (tNode*)0) {
             return;
@@ -468,10 +474,11 @@ void TimerProcess_SPI(void) {
     
     if (FPGA_State == FPGA_TRIG) {
         if (SpiTimer_fScreen++ >= FLUSH_SCREEN_TIME) {
-            screenMsg.wTriRecord(0);
+            screenMsg.wTriRecord(&SpiTimer_tCntT);
             screenMsg.wTriBatch(0);
+            SpiTimer_tCntT   = 0;
             SpiTimer_sRecord = 0;
-            FPGA_State = FPGA_TRIG_DONE;
+            FPGA_State       = FPGA_TRIG_DONE;
         }
     }
     

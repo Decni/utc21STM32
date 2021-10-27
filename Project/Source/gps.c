@@ -187,6 +187,8 @@ void GpsProcess (void) {
                     if (FPGA_State == FPGA_TIMEINIT) {
                         SpiPackaged(Mask_GPS, t_time);                 /*  ≈‰÷√ FPGA  ±º‰                */
                         screenMsg.rRtc(0);
+                        screenMsg.wLock((void*)1);
+                        screenMsg.wCtrl((void*)1);
                         FPGA_State = FPGA_WORK;
                         Debug(GPS_DEBUG, Red(CONFIG)" FPGA GPS Time To %#lx"endl, t_time);
                         Debug(GPS_DEBUG, "Now: %s"endl, asctime(localtime(&t_time)));

@@ -528,6 +528,7 @@ static void ScreenMsg_wTriRecord (void *arg) {
     tScreenTxNode *tmpTxNode;
     tTriDataNode  *tmpTriNode;
     tNode         *tmpNode;
+    uint32_t        breakCnt;
     int32_t        tmpListCnt;
     struct tm     *tmpDate;
     uint32_t       tmpTime, tmpMs, tmpUs, tmpNs;
@@ -542,7 +543,12 @@ static void ScreenMsg_wTriRecord (void *arg) {
         return;
     }
     
-    
+    if (arg != (void*)0) {
+        breakCnt = *(uint32_t*)arg; 
+        breakCnt = breakCnt > 5 ? 4 : breakCnt - 1;
+    } else {
+        breakCnt = 4;
+    }
     
     for (uint16_t i = 0; i < tmpListCnt; i++) {
         tmpTriNode = getNodeParent(tTriDataNode, node, tmpNode);
@@ -600,7 +606,7 @@ static void ScreenMsg_wTriRecord (void *arg) {
         
         listAddFirst(&ScreenTxList, &(tmpTxNode->node));
         
-        if (i == 4) {
+        if (i == breakCnt) {
             break;
         }
         
@@ -1599,10 +1605,74 @@ static void ScreenMsg_wNrToRecord (void *arg) {
 }
 
 /*
+    显示 LOCK 信号
+*/
+static void ScreenMsg_wLock (void *arg) {
+    tScreenTxNode *tmpTxNode;
+    
+    tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
+    if (tmpTxNode == (tScreenTxNode*)0) {
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
+        return;
+    }
+    tmpTxNode->msgCnt = 0;
+    
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xEE;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xB1;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x23;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x00;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x03;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x00;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x0B;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = arg > 0 ? 0x01 : 0x00; 
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFF;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFC;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFF;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFF;
+    
+    listAddLast(&ScreenTxList, &(tmpTxNode->node));
+    tmpTxNode = (tScreenTxNode*)0;
+}
+
+/*
+    使能或禁止控件
+*/
+static void ScreenMsg_wCtrl (void *arg) {
+    tScreenTxNode *tmpTxNode;
+    
+    tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
+    if (tmpTxNode == (tScreenTxNode*)0) {
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
+        return;
+    }
+    tmpTxNode->msgCnt = 0;
+    
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xEE;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xB1;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x04;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x00;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x03;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x00;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x07;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = arg > 0 ? 0x01 : 0x00; 
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFF;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFC;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFF;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFF;
+    
+    listAddLast(&ScreenTxList, &(tmpTxNode->node));
+    tmpTxNode = (tScreenTxNode*)0;
+}
+
+/*
     屏幕串口发送函数
 */
 void ScreenTransmit (void) {
     tNode *tmpNode;
+    
+    if (screenInfo.ID == UNKNOW) {
+        return;
+    }
     
     if ((ScreenComStateTx == ScreenComState_TransmitIdle) && (listGetCount(&ScreenTxList) > 0)) {
         tmpNode = listRemoveFirst(&ScreenTxList);
@@ -1702,9 +1772,17 @@ void ScreenProcess(void) {
             pMsgIndex++;
             if (*((uint32_t*)pMsgIndex) == 0xFFFFFCFF) {               /*  校验包尾                      */
                 screenInfo.Power = true;
-                screenMsg.rRtc(0);
                 screenMsg.wSetBatch(0);
                 screenMsg.wTriDelay(0);
+                if (FPGA_State >= FPGA_WORK) {
+                    screenMsg.wLock((void*)1);
+                    screenMsg.wCtrl((void*)1);
+                } else {
+                    screenMsg.rRtc(0);
+                    screenMsg.wLock(0);
+                    screenMsg.wCtrl(0);
+                }
+                
                 screenMsg.wTriRecord(0);
                 screenMsg.wRecord(0);                                  /*  更新缓存在 flash 中的数据     */
                 Debug(SCREEN_DEBUG, "Screen Power On."endl);
@@ -1912,9 +1990,9 @@ void ScreenProcess(void) {
                                         NotifyFPGA(Mode_SyncTri);
                                     } else {
                                         NotifyFPGA(Mode_DelayTri);
-                                        if (SpiTimer_tCount > 0) {
-                                            screenMsg.wRecord(&SpiTimer_tCount);
-                                            SpiTimer_tCount = 0;
+                                        if (SpiTimer_tCntR > 0) {
+                                            screenMsg.wRecord(&SpiTimer_tCntR);
+                                            SpiTimer_tCntR = 0;
                                         }
                                     }
                                     break;
@@ -1957,20 +2035,20 @@ void ScreenProcess(void) {
     屏幕定时相关，在定时器中调用
 */
 void TimeoutProcess_Screen(void) {
-    if(ScreenComStateTx == ScreenComState_TransmitWaiting) {           /*  两条指令之间的间隔时长        */
+    if (ScreenComStateTx == ScreenComState_TransmitWaiting) {          /*  两条指令之间的间隔时长        */
         ScreenTimer_TW++;
-        if(ScreenTimer_TW >= TX_WAITING_TIME) {
+        if (ScreenTimer_TW >= TX_WAITING_TIME) {
             ScreenComStateTx = ScreenComState_TransmitIdle;
         }
     }
     
-    if(screenInfo.ID == UNKNOW) {                                      /*  屏幕未连接时，1s发送复位信号  */
+    if (screenInfo.ID == UNKNOW) {                                      /*  屏幕未连接时，1s发送复位信号  */
         ScreenTimer_PW++;
-        if(ScreenTimer_PW >= POWER_WAITING_TIME) {
-            if(screenInfo.Power == false) {                            /*  未上电                        */
+        if (ScreenTimer_PW >= POWER_WAITING_TIME) {
+            if (screenInfo.Power == false) {                           /*  未上电                        */
                 PowerOn_Screen();
                 screenInfo.Power = true;
-            } else if (ScreenTimer_PW >= POWER_RESET_TIME){            /*  已上电                        */
+            } else if (ScreenTimer_PW >= POWER_RESET_TIME) {           /*  已上电                        */
                 
                 screenMsg.Reset(0);                                    /*  复位屏幕                      */
                 ScreenTimer_PW = 0;
@@ -2073,6 +2151,8 @@ static void ScreenStateInit (void) {
     screenMsg.wTriBatch   = ScreenMsg_wTriBatch;
     screenMsg.wNrToTest   = ScreenMsg_wNrToTest;
     screenMsg.wNrToRecord = ScreenMsg_wNrToRecord;
+    screenMsg.wLock       = ScreenMsg_wLock;
+    screenMsg.wCtrl       = ScreenMsg_wCtrl;
     
     screenInfo.ID         = UNKNOW;
     screenInfo.Power      = false;

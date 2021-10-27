@@ -5,13 +5,13 @@
 #include "color.h"
 
 #define SHELL_TX_MAX_BYTE    256
-#define SHELL_TX_MAX_ITEM    28
-#define SHELL_RX_MAX_BYTE    64
-#define SHELL_RX_MAX_ITEM    4
-#define SHELL_CMD_MAX_ITEM   20
-#define SHELL_ECHO_MAX_BYTE  64 
+#define SHELL_TX_MAX_ITEM     28
+#define SHELL_RX_MAX_BYTE     64
+#define SHELL_RX_MAX_ITEM      4
+#define SHELL_CMD_MAX_ITEM    20
+#define SHELL_ECHO_MAX_BYTE   64 
 
-#define endl        "\r"
+#define endl "\r"
 
 #define Red(str)   COLOR_START COLOR_FG_RED   COLOR_TYPE_BOLD #str COLOR_STOP
 #define Green(str) COLOR_START COLOR_FG_GREEN COLOR_TYPE_BOLD #str COLOR_STOP
