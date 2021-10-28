@@ -7,8 +7,7 @@
 #include "shell.h"
 
 tList MemoryList;
-const char *MemHeag = "           Name  BlockSize  BlockNum  FreeNum  MaxNum  \r"endl;
-//                    "    ScreenRxMem     128       255       664     576    \r" 
+const char *MemHeag = "           Name | BlockSize | BlockNum | FreeNum | MaxNum"endl; 
 const char *MemHelp = "        "Blue(ms)": Memory Show."endl
                       "        [ ] Show All Memory Infomation."endl
                       "       [-h] Show ms Help."endl;
@@ -145,7 +144,7 @@ void ShellCallback_Memory (char *arg) {
     while (pNode != (tNode*)0) {
         pMemNode = getNodeParent(tMemory, node, pNode);
         memGetInfo(pMemNode, &memInfo);
-        tmpCnt = sprintf(tmpBuff,Blue(%15s)"     %3u       %3u       %3u     %3u"endl,
+        tmpCnt = sprintf(tmpBuff,Blue(%15s)"      %3u        %3u        %3u      %3u"endl,
         memInfo.name, memInfo.blockSize, memInfo.blockCount, memInfo.freeCount, memInfo.maxCount);
         tmpBuff[tmpCnt] = '\0';
         ShellPakaged(tmpBuff);

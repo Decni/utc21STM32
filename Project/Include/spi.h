@@ -5,7 +5,7 @@
 #include "memory.h"
 
 #define SPI_TX_MAX_BYTE       5
-#define SPI_TX_MAX_ITEM      20
+#define SPI_TX_MAX_ITEM      32
 #define SPI_RX_MAX_BYTE       8
 #define SPI_RX_MAX_ITEM      20
 
