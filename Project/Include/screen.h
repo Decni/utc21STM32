@@ -5,14 +5,14 @@
 #include "spi.h"
 #include <stdbool.h>
 
-#define SCREEN_TX_MAX_BYTE    64
-#define SCREEN_TX_MAX_ITEM    72
-#define SCREEN_RX_MAX_BYTE    28
-#define SCREEN_RX_MAX_ITEM    4
+#define SCREEN_TX_MAX_BYTE      64
+#define SCREEN_TX_MAX_ITEM      64
+#define SCREEN_RX_MAX_BYTE      32
+#define SCREEN_RX_MAX_ITEM       8
  
 #define TX_WAITING_TIME       1000                                     /*  u16 两条指令间隔 100ms        */
-#define POWER_WAITING_TIME    1000                                     /*  u16 100ms                     */
-#define POWER_RESET_TIME      30000                                    /*  u16 3s                        */
+#define POWER_WAITING_TIME     500                                     /*  u16  50ms                     */
+#define POWER_RESET_TIME     30000                                     /*  u16 3s                        */
 
 typedef struct _screenTxNode {
     tNode   node;

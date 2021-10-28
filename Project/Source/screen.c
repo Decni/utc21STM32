@@ -725,7 +725,7 @@ static void ScreenMsg_wRecord (void *arg) {
 
         if (arg != (void*)0) {
             listAddFirst(&ScreenTxList, &(tmpTxNode->node));
-            if (i == *(uint32_t*)arg) {
+            if (i == *(uint32_t*)arg - 1) {
                 break;
             }
         } else {
