@@ -356,6 +356,8 @@ void DMA1_Channel5_IRQHandler(void)
 */
 static void SpecialPinInit(void) {
     GPIO_InitTypeDef GPIO_InitStructure;
+    NVIC_InitTypeDef NVIC_InitStructure;    
+    EXTI_InitTypeDef EXTI_InitStructure;
     
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_GPIOC, ENABLE);
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);
@@ -367,8 +369,22 @@ static void SpecialPinInit(void) {
     GPIO_SetBits(GPIOA,GPIO_Pin_0);
     
     GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_6;
-    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_IPD;
+    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_IPU;
     GPIO_Init(GPIOA, &GPIO_InitStructure);                             /*  PA6     pps LOCK(1)           */
+    
+    GPIO_EXTILineConfig(GPIO_PortSourceGPIOA, GPIO_PinSource6);
+    
+    EXTI_InitStructure.EXTI_Line    = EXTI_Line6; 
+    EXTI_InitStructure.EXTI_Mode    = EXTI_Mode_Interrupt; 
+    EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising_Falling;     /*  上升沿锁定，下降沿守时        */
+    EXTI_InitStructure.EXTI_LineCmd = ENABLE;
+    EXTI_Init(&EXTI_InitStructure);
+
+    NVIC_InitStructure.NVIC_IRQChannel                   = EXTI9_5_IRQn;
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority        = 2;
+    NVIC_InitStructure.NVIC_IRQChannelCmd                = ENABLE;
+    NVIC_Init(&NVIC_InitStructure);
     
     GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_7;
     GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_Out_PP;
@@ -397,6 +413,23 @@ static void SpecialPinInit(void) {
     GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_3;
     GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_IPD;
     GPIO_Init(GPIOC, &GPIO_InitStructure);                             /*  PC3    触发通知               */
+}
+
+/* 
+    pps 锁定信号
+*/
+void EXTI9_5_IRQHandler(void)
+{
+    uint8_t tmpArg;
+     if (EXTI_GetITStatus(EXTI_Line6)) {
+         EXTI_ClearITPendingBit(EXTI_Line6);
+         if (GPIOA->IDR & GPIO_Pin_6) {                                /*  上升沿                        */
+            tmpArg = 0x01;
+         } else {
+            tmpArg = 0x02; 
+         }
+         screenMsg.wLock(&tmpArg);
+     }
 }
 
 /*

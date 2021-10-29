@@ -1624,7 +1624,7 @@ static void ScreenMsg_wLock (void *arg) {
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x03;
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x00;
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x0B;
-    tmpTxNode->buff[tmpTxNode->msgCnt++] = arg > 0 ? 0x01 : 0x00; 
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = (*(uint8_t*)arg) & 0x03; 
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFF;
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFC;
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFF;
@@ -1654,7 +1654,7 @@ static void ScreenMsg_wCtrl (void *arg) {
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x03;
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x00;
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x07;
-    tmpTxNode->buff[tmpTxNode->msgCnt++] = arg > 0 ? 0x01 : 0x00; 
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = (*(uint8_t*)arg) & 0x01; 
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFF;
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFC;
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFF;
@@ -1725,6 +1725,7 @@ void ScreenProcess(void) {
     tScreenRxNode *tmpRxNode;
     tNode         *tmpNode;
     uint8_t       *pMsgEnd, *pMsgIndex;
+    uint8_t        tmpArg;
     uint32_t       outDelay = 0;
     uint32_t       triDelay = 0;
     long double    tmpData  = 0;
@@ -1775,14 +1776,13 @@ void ScreenProcess(void) {
                 screenMsg.wSetBatch(0);
                 screenMsg.wTriDelay(0);
                 if (FPGA_State >= FPGA_WORK) {
-                    screenMsg.wLock((void*)1);
-                    screenMsg.wCtrl((void*)1);
+                    tmpArg = 1;
                 } else {
+                    tmpArg = 0;
                     screenMsg.rRtc(0);
-                    screenMsg.wLock(0);
-                    screenMsg.wCtrl(0);
                 }
-                
+                screenMsg.wLock(&tmpArg);
+                screenMsg.wCtrl(&tmpArg);
                 screenMsg.wTriRecord(0);
                 screenMsg.wRecord(0);                                  /*  更新缓存在 flash 中的数据     */
                 Debug(SCREEN_DEBUG, "Screen Power On."endl);
