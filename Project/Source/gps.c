@@ -137,6 +137,7 @@ static uint8_t GetComma(char *msg, uint8_t num) {
 void GpsProcess (void) {
     char      *token;
     uint8_t   tmpPos;
+    uint8_t   tmpArg;
     struct tm time;
     time_t    t_time = 0;
     
@@ -187,8 +188,9 @@ void GpsProcess (void) {
                     if (FPGA_State == FPGA_TIMEINIT) {
                         SpiPackaged(Mask_GPS, t_time);                 /*  ≈‰÷√ FPGA  ±º‰                */
                         screenMsg.rRtc(0);
-                        screenMsg.wLock((void*)1);
-                        screenMsg.wCtrl((void*)1);
+                        tmpArg = 1;
+                        screenMsg.wLock(&tmpArg);
+                        screenMsg.wCtrl(&tmpArg);
                         FPGA_State = FPGA_WORK;
                         Debug(GPS_DEBUG, Red(CONFIG)" FPGA GPS Time To %#lx"endl, t_time);
                         Debug(GPS_DEBUG, "Now: %s"endl, asctime(localtime(&t_time)));
