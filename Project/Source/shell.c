@@ -396,6 +396,7 @@ static void ShellCallback_SoftReset(char *arg) {
     初始化完成显示欢迎logo
 */
 void ShellSplash(void) {
+    ShellPakaged(endl);
     ShellPakaged(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"endl);
     ShellPakaged("^ kkkk  kkk     kkkkkk     kkk     kkkk         kkkkkkk    v"endl);
     ShellPakaged("^  kk  kk         kk       kk k     kk        kk       kk  v"endl);
