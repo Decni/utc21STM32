@@ -730,7 +730,7 @@ static void ScreenMsg_wRecord (void *arg) {
             }
         } else {
             
-            listAddLast(&ScreenTxList, &(tmpTxNode->node));
+            listAddFirst(&ScreenTxList, &(tmpTxNode->node));
         }
 
         tmpNode = listGetNext(TriList, tmpNode);

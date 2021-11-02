@@ -108,7 +108,7 @@ void ComInit_Shell (uint32_t USART_BaudRate) {
     ShellCmdAdd("ms", ShellCallback_Memory, MemHelp);
     ShellCmdAdd("cls", Shellcallback_ClearScreen, ClsHelp);
     ShellCmdAdd("rst", ShellCallback_SoftReset, RstHelp);
-    Debug(SHELL_DEBUG, "\rShell Com Initialization is Complete!"endl);  
+    Debug(SHELL_DEBUG, "Shell Com Initialization is Complete!"endl);  
 }
 
 /*
@@ -120,7 +120,6 @@ void ShellPakaged(const char* format, ...) {
     
     tmpTxNode = (tShellTxNode*)memGet(&ShellTxMem);                    /*  …Í«Î“ªøÈƒ⁄¥Ê                  */
     if (tmpTxNode == (tShellTxNode*)0) {
-        Debug(SHELL_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
         return;
     }
     
