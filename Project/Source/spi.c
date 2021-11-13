@@ -100,7 +100,7 @@ static void ShellCallback_ResetFPGA (char *arg);
     SPI_InitStructure.SPI_CPOL              = SPI_CPOL_High; 
     SPI_InitStructure.SPI_CPHA              = SPI_CPHA_2Edge;
     SPI_InitStructure.SPI_NSS               = SPI_NSS_Soft;
-    SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_2;
+    SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_64;
     SPI_InitStructure.SPI_FirstBit          = SPI_FirstBit_LSB;
     SPI_InitStructure.SPI_CRCPolynomial     = 7;
     SPI_Init(SPI2, &SPI_InitStructure);                                /*  SPI基本配置                   */
@@ -455,11 +455,13 @@ void NotifyFPGA(tMode mode) {
         case Mode_DelayTri:                                            /*  定时触发模式                  */
             GPIO_ResetBits(GPIOC,GPIO_Pin_2);
             screenInfo.TriMode = Mode_DelayTri;
+            Debug(SPI_DEBUG, "Convert to Time Mode!"endl);
             break;
         
         case Mode_SyncTri:                                             /*  同步触发模式                  */
             GPIO_SetBits(GPIOC,GPIO_Pin_2);
             screenInfo.TriMode = Mode_SyncTri;
+            Debug(SPI_DEBUG, "Convert to Sync Mode!"endl);
             break;
         
         case Mode_Reset:
@@ -767,4 +769,19 @@ static void ShellCallback_DelayTri(char *arg) {
 */
 static void ShellCallback_ResetFPGA (char *arg) {
     NotifyFPGA(Mode_Reset);
+    SpiPackaged(Mask_PO1, Config.po1 * CONFIG_FACTOR);
+    SpiPackaged(Mask_PO2, Config.po2 * CONFIG_FACTOR);
+    SpiPackaged(Mask_PO3, Config.po3 * CONFIG_FACTOR);
+    SpiPackaged(Mask_PO4, Config.po4 * CONFIG_FACTOR);
+    SpiPackaged(Mask_EO1, Config.eo1 * CONFIG_FACTOR);
+    SpiPackaged(Mask_EO2, Config.eo2 * CONFIG_FACTOR);
+    SpiPackaged(Mask_EO3, Config.eo3 * CONFIG_FACTOR);
+    SpiPackaged(Mask_EO4, Config.eo4 * CONFIG_FACTOR);
+    SpiPackaged(Mask_EO5, Config.eo5 * CONFIG_FACTOR);
+    SpiPackaged(Mask_EO6, Config.eo6 * CONFIG_FACTOR);
+    SpiPackaged(Mask_EO7, Config.eo7 * CONFIG_FACTOR);
+    SpiPackaged(Mask_EO8, Config.eo8 * CONFIG_FACTOR);
+    SpiPackaged(Mask_triDelay, Config.triDelay * CONFIG_FACTOR);
+    FPGA_State = FPGA_RESET;
+    
 }

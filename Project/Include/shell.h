@@ -5,7 +5,7 @@
 #include "color.h"
 
 #define SHELL_TX_MAX_BYTE    256
-#define SHELL_TX_MAX_ITEM     32
+#define SHELL_TX_MAX_ITEM    128
 #define SHELL_RX_MAX_BYTE     32
 #define SHELL_RX_MAX_ITEM      8
 #define SHELL_CMD_MAX_ITEM    20

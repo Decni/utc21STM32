@@ -145,7 +145,9 @@ void GpsProcess (void) {
         token = strtok(pGpsProcess->buff, "$");
   
         while(token != (char*)0) {
-            if (strncmp(token, "GNRMC", 5) == 0) {                     /*  RMC报文                       */
+            if ((strncmp(token, "GNRMC", 5) == 0)
+             || (strncmp(token, "GPRMC", 5) == 0)
+             || (strncmp(token, "BDRMC", 5) == 0)) {                   /*  RMC报文                       */
                 tmpPos = GetComma(token, 1);                           /*  UTC时间                       */    
                 if (token[tmpPos] != ',') {
                     time.tm_hour = (token[tmpPos] - '0') * 10 + (token[tmpPos + 1]-'0');
@@ -197,11 +199,13 @@ void GpsProcess (void) {
                     } 
                 }
             }
-            
-            if (strncmp(token, "GNGGA", 5) == 0) {                     /*  GGA报文                       */
+#if 0           
+            if ((strncmp(token, "GNGGA", 5) == 0)
+             || (strncmp(token, "GPGGA", 5) == 0)
+             || (strncmp(token, "BDGGA", 5) == 0)) {                   /*  GGA报文                       */
                 
             }
-            
+#endif
             token = strtok(NULL, "$");                                 /*  下一帧数据                    */
         }
         
