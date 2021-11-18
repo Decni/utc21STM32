@@ -114,7 +114,7 @@ void ComInit_Shell (uint32_t USART_BaudRate) {
 /*
     shell打包函数
 */
-void ShellPakaged(const char* format, ...) {
+void ShellPakaged (const char* format, ...) {
     tShellTxNode *tmpTxNode;
     va_list       var;
     
@@ -135,7 +135,7 @@ void ShellPakaged(const char* format, ...) {
 /*
     shell发送函数
 */
-void ShellTransmit(void) {
+void ShellTransmit (void) {
     tNode *pNode;
     
     if (ShellComState == ShellCom_Idle) {
@@ -158,7 +158,7 @@ void ShellTransmit(void) {
 /*
     shell接收函数
 */
-void ShellReceve(void) {
+void ShellReceve (void) {
     if (ShellComRxState == ShellCom_Receve) {
         if (pShellRxNodeCurr == pShellRxNodeA) {
             if (listGetCount(&ShellRxList) < SHELL_RX_MAX_ITEM) {
@@ -247,7 +247,7 @@ void ShellProcess (void) {
 /*
     回显字符处理
 */
-void ShellEchoProcess(uint16_t ch) {
+void ShellEchoProcess (uint16_t ch) {
     switch (ch) {
         case CHAR_DE:                                                  /* 0x7f delete                    */
                                                                        /*  没有 break                    */
@@ -304,7 +304,7 @@ void ShellEchoProcess(uint16_t ch) {
 /*
     屏幕串口中断服务函数
 */
-void Shell_COM_IRQHandler(void) {
+void Shell_COM_IRQHandler (void) {
     uint16_t ch;
     
     if(USART_GetITStatus(Shell_COM,USART_IT_RXNE)) {                   /*  接收中断                      */
@@ -342,7 +342,7 @@ void Shell_COM_IRQHandler(void) {
 /*
     shell指令添加函数
 */
-void ShellCmdAdd(const char *cmd, tShellFun fun, const char *help) {
+void ShellCmdAdd (const char *cmd, tShellFun fun, const char *help) {
     tShellCmdNode *pCmdNode;
 
     pCmdNode = (tShellCmdNode*)memGet(&ShellCmdMem);
@@ -380,32 +380,47 @@ static void ShellCallback_ShowHelp (char *arg) {
 /*
     清屏指令
 */
-static void Shellcallback_ClearScreen(char *arg) {
+static void Shellcallback_ClearScreen (char *arg) {
     ShellPakaged("\033c");
 }
 
 /*
     软复位
 */
-static void ShellCallback_SoftReset(char *arg) {
+static void ShellCallback_SoftReset (char *arg) {
     __set_FAULTMASK(1);                                                /*  关闭所有中断                  */ 
     NVIC_SystemReset();                                                /*  复位                          */ 
 }
-
+#if 0
 /*
     初始化完成显示欢迎logo
 */
-void ShellSplash(void) {
+void ShellSplash (void) {
     ShellPakaged(endl);
     ShellPakaged(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"endl);
-    ShellPakaged("^ kkkk  kkk     kkkkkk     kkk     kkkk         kkkkkkk    v"endl);
-    ShellPakaged("^  kk  kk         kk       kk k     kk        kk       kk  v"endl);
-    ShellPakaged("^  kk kk          kk       kk kk    kk      kk             v"endl);
-    ShellPakaged("^  kkk            kk       kk  kk   kk      kk      kkkkk  v"endl);
-    ShellPakaged("^  kkkkk          kk       kk   k   kk      kk         kk  v"endl);
-    ShellPakaged("^  kk  kk         kk       kk    kk kk      kk         kk  v"endl);
-    ShellPakaged("^  kk   kk        kk       kk     k kk        kk       kk  v"endl);
-    ShellPakaged("^ kkkk  kkk     kkkkkk    kkkk     kkk          kkkkkkk    v"endl);
+    ShellPakaged("^ kkkk  kkk     kkkkkk     kkk     kkkk         kkkkkkk    ^"endl);
+    ShellPakaged("^  kk  kk         kk       kk k     kk        kk       kk  ^"endl);
+    ShellPakaged("^  kk kk          kk       kk kk    kk      kk             ^"endl);
+    ShellPakaged("^  kkk            kk       kk  kk   kk      kk      kkkkk  ^"endl);
+    ShellPakaged("^  kkkkk          kk       kk   k   kk      kk         kk  ^"endl);
+    ShellPakaged("^  kk  kk         kk       kk    kk kk      kk         kk  ^"endl);
+    ShellPakaged("^  kk   kk        kk       kk     k kk        kk       kk  ^"endl);
+    ShellPakaged("^ kkkk  kkk     kkkkkk    kkkk     kkk          kkkkkkk    ^"endl);
     ShellPakaged("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"endl);
+    ShellPakaged(Green(KD>\040));
+}
+#endif
+void ShellSplash (void) {
+    ShellPakaged(endl);
+    ShellPakaged(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"endl);
+    ShellPakaged("^ kkkk  kkk  kkkkkk   kkk     kkkk      kkkkkkk     dddddd     dd   ^"endl);
+    ShellPakaged("^  kk  kk      kk     kk k     kk     kk       kk  dd   dd   d dd   ^"endl);
+    ShellPakaged("^  kk kk       kk     kk kk    kk   kk                 dd      dd   ^"endl);
+    ShellPakaged("^  kkk         kk     kk  kk   kk   kk      kkkkk     dd       dd   ^"endl);
+    ShellPakaged("^  kkkkk       kk     kk   k   kk   kk         kk    dd        dd   ^"endl);
+    ShellPakaged("^  kk  kk      kk     kk    kk kk   kk         kk  ddddddd   dddddd ^"endl);
+    ShellPakaged("^  kk   kk     kk     kk     k kk     kk       kk                   ^"endl);
+    ShellPakaged("^ kkkk  kkk  kkkkkk  kkkk     kkk       kkkkkkk       "Blue(version: v0.1)" ^"endl);
+    ShellPakaged("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"endl);
     ShellPakaged(Green(KD>\040));
 }

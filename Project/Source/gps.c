@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <string.h>
 #include <time.h>
 #include <stdbool.h>
@@ -7,10 +8,17 @@
 #include "shell.h"
 #include "screen.h"
 
-tGpsReceve  GpsReceveA, GpsReceveB;
-tGpsReceve *pGpsReceve, *pGpsProcess;
-bool        RTC_InitFlag;
+tGpsReceve   GpsReceveA,  GpsReceveB;
+tGpsReceve  *pGpsReceve, *pGpsProcess;
+tGpsPosition GpsPosition = {0};
+bool         RTC_InitFlag;
+
+const char  *GetPositionHelp = "        "Blue(pi)": Position Information."endl
+                               "        [ ] Show Position Information."endl
+                               "       [-h] Show pi help."endl;
+
 static void DMA_Config_GPS(void);
+static void ShellCallback_GetPosition (char *arg);
 
 /*
     GPS串口初始化函数
@@ -63,6 +71,7 @@ void ComInit_GPS(uint32_t USART_BaudRate)
     
     USART_Cmd(GPS_COM, ENABLE);
     
+    ShellCmdAdd("pi", ShellCallback_GetPosition, GetPositionHelp);
     Debug(GPS_DEBUG, "GPS Com Initialization is Complete!"endl);
 }
 
@@ -140,6 +149,7 @@ void GpsProcess (void) {
     uint8_t   tmpArg;
     struct tm time;
     time_t    t_time = 0;
+    uint8_t   tmppBuff[15] = {0};
     
     if (pGpsProcess->size > 0) {
         token = strtok(pGpsProcess->buff, "$");
@@ -148,32 +158,91 @@ void GpsProcess (void) {
             if ((strncmp(token, "GNRMC", 5) == 0)
              || (strncmp(token, "GPRMC", 5) == 0)
              || (strncmp(token, "BDRMC", 5) == 0)) {                   /*  RMC报文                       */
-                tmpPos = GetComma(token, 1);                           /*  UTC时间                       */    
-                if (token[tmpPos] != ',') {
-                    time.tm_hour = (token[tmpPos] - '0') * 10 + (token[tmpPos + 1]-'0');
-                    time.tm_min  = (token[tmpPos + 2] +  - '0') * 10 + (token[tmpPos + 3]-'0');
-                    time.tm_sec  = (token[tmpPos + 4] - '0') * 10 + (token[tmpPos + 5]-'0');
-                } else {
-                    time.tm_hour = 0;
-                    time.tm_min  = 0;
-                    time.tm_sec  = 0;
-                }
+                 tmpPos = GetComma(token, 2);
+                if (token[tmpPos] == 'A') {
+                    tmpPos = GetComma(token, 1);                       /*  UTC时间                       */    
+                    if (token[tmpPos] != ',') {
+                        time.tm_hour = (token[tmpPos] - '0') * 10 + (token[tmpPos + 1]-'0');
+                        time.tm_min  = (token[tmpPos + 2] +  - '0') * 10 + (token[tmpPos + 3]-'0');
+                        time.tm_sec  = (token[tmpPos + 4] - '0') * 10 + (token[tmpPos + 5]-'0');
+                    } else {
+                        time.tm_hour = 0;
+                        time.tm_min  = 0;
+                        time.tm_sec  = 0;
+                    }
                 
-                tmpPos = GetComma(token, 9);                           /*  UTC日期                       */
-                if (token[tmpPos] != ',') {
-                    time.tm_mday = (token[tmpPos] - '0') * 10 + (token[tmpPos + 1]-'0');
-                    time.tm_mon  = (token[tmpPos + 2] +  - '0') * 10
-                                + (token[tmpPos + 3]-'0') - 1;
-                    time.tm_year = (token[tmpPos + 4] - '0') * 10
-                                + (token[tmpPos + 5]-'0') + 100;      /*  + 2000 - 1900                  */
-                } else {
-                    time.tm_mday = 0;
-                    time.tm_mon  = 0;
-                    time.tm_year = 0;
-                }
-   
-                tmpPos = GetComma(token, 2);
-                if (token[tmpPos] == 'A') {                            /*  pps 数据有效                  */
+                    tmpPos = GetComma(token, 9);                       /*  UTC日期                       */
+                    if (token[tmpPos] != ',') {
+                        time.tm_mday = (token[tmpPos] - '0') * 10 + (token[tmpPos + 1]-'0');
+                        time.tm_mon  = (token[tmpPos + 2] +  - '0') * 10
+                                    + (token[tmpPos + 3]-'0') - 1;
+                        time.tm_year = (token[tmpPos + 4] - '0') * 10
+                                    + (token[tmpPos + 5]-'0') + 100;  /*  + 2000 - 1900                  */
+                    } else {
+                        time.tm_mday = 0;
+                        time.tm_mon  = 0;
+                        time.tm_year = 0;
+                    }
+                
+                    tmpPos = GetComma(token, 3);                       /*  纬度                          */
+                    if (token[tmpPos] != ',') {
+                        GpsPosition.latD = (token[tmpPos] - '0') * 10 + (token[tmpPos + 1]-'0');
+                        
+                        for (int i = 0; i < 15; i++) {
+                            tmppBuff[i] = token[tmpPos + 2 + i];
+                            if (tmppBuff[i] == ',') {
+                                tmppBuff[i] = '\0';
+                                break;
+                            }
+                        }
+                        tmppBuff[14] = '\0';
+                        sscanf((const char*)tmppBuff, "%f", &(GpsPosition.latM));
+                        GpsPosition.valid = 1;
+                    } else {
+                        GpsPosition.latD  = 0;
+                        GpsPosition.latM  = 0.0f;
+                        GpsPosition.valid = 0;
+                    }
+                
+                    tmpPos = GetComma(token, 4);                       /*  纬度方向                        */
+                    if (token[tmpPos] != ',') {
+                        GpsPosition.ulat  = token[tmpPos];
+                        GpsPosition.valid = 1;
+                    } else {
+                        GpsPosition.ulat  = 'x';
+                        GpsPosition.valid = 0;
+                    }
+                
+                    tmpPos = GetComma(token, 5);                       /*  经度                          */
+                    if (token[tmpPos] != ',') {
+                        GpsPosition.lonD = (token[tmpPos] - '0')   * 100
+                                         + (token[tmpPos + 1]-'0') *  10
+                                         + (token[tmpPos + 2]-'0');
+                        for (int i = 0; i < 15; i++) {
+                            tmppBuff[i] = token[tmpPos + 3 + i];
+                            if (tmppBuff[i] == ',') {
+                                tmppBuff[i] = '\0';
+                                break;
+                            }
+                        }
+                        tmppBuff[14] = '\0';
+                        sscanf((const char*)tmppBuff, "%f", &(GpsPosition.lonM));
+                        GpsPosition.valid = 1;
+                    } else {
+                        GpsPosition.lonD = 0;
+                        GpsPosition.lonM = 0.0f;
+                        GpsPosition.valid  = 0;
+                    }
+                
+                    tmpPos = GetComma(token, 6);                       /*  经度方向                        */
+                    if (token[tmpPos] != ',') {
+                        GpsPosition.ulon  = token[tmpPos];
+                        GpsPosition.valid = 1;
+                    } else {
+                        GpsPosition.ulon  = 'x';
+                        GpsPosition.valid = 0;
+                    }
+
                     t_time = mktime(&time) + 28800;                    /*  东 8 区  + 8 * 60 * 60        */
                                                                        /*  更新一次本地 rtc 时间         */
                     if ((RTC_InitFlag == false) && (screenInfo.ID != UNKNOW)) { 
@@ -243,6 +312,21 @@ void GPS_COM_IRQHandler(void)
         DMA_SetCurrDataCounter(GPS_COM_RX_DMA1CHANNEL,GPS_RX_MAX_BYTE);
         DMA_Cmd(GPS_COM_RX_DMA1CHANNEL,ENABLE); 
         USART_DMACmd(GPS_COM,USART_DMAReq_Rx,ENABLE);                  /*  使能DMA接收                   */
+    }
+}
+
+static void ShellCallback_GetPosition (char *arg) {
+    
+    if (GpsPosition.valid == 1) {
+        ShellPakaged("Position Information:"endl
+                     "    lat: %d^%f'"endl
+                     "   ulat: %c"endl
+                     "    lon: %d^%f'"endl
+                     "   ulon: %c"endl,
+                         GpsPosition.latD, GpsPosition.latM, GpsPosition.ulat, 
+                         GpsPosition.lonD, GpsPosition.lonM, GpsPosition.ulon);
+    } else {
+        ShellPakaged("Position Information Invaild!"endl);
     }
 }
 

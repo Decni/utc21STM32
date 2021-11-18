@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <ctype.h>
 #include "platform_config.h"
 #include "spi.h"
 #include "list.h"
@@ -20,15 +21,16 @@ const char *DelayHead     = " Number | Channel | Delay Time(us)"endl;
 const char *TimestampHelp = "        "Blue(ts)": timestamp"endl
                             "        [ ] Show All."endl
                             "       [-x] Show The Last x Records.(x = 1,2,3...)"endl
+                            "       [-f] Delet Timestamp Records."endl
                             "       [-h] Show ts help."endl;
 const char *OutDelayHelp  = "        "Blue(od)": out delay  delta(t) = 0.01 us."endl
                             "        [ ] Show All."endl
-                            "    [-px n] Set POx Value."endl
-                            "    [-ex n] Set EOx Value.(n(us). x = 1,2,3...)"endl
+                            "   [-pox n] Set POx Value To n us."endl
+                            "   [-eox n] Set EOx Value To n us.(n(us). x = 1,2,3...)"endl
                             "       [-h] Show od help."endl;
 const char *DelayTriHelp  = "        "Blue(dt)": delay trigger delta(t) = 0.01 us."endl
                             "        [ ] Show Delay Value."endl
-                            "     [-p n] Set Delay Value."endl
+                            "     [-p n] Set Delay Value To n us."endl
                             "       [-h] Show dt help."endl;
 const char *ResetFpgaHelp = "        "Blue(rf)": reset fpga."endl
                             "        [ ] Reset FPGA."endl
@@ -100,7 +102,7 @@ static void ShellCallback_ResetFPGA (char *arg);
     SPI_InitStructure.SPI_CPOL              = SPI_CPOL_High; 
     SPI_InitStructure.SPI_CPHA              = SPI_CPHA_2Edge;
     SPI_InitStructure.SPI_NSS               = SPI_NSS_Soft;
-    SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_64;
+    SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_128;
     SPI_InitStructure.SPI_FirstBit          = SPI_FirstBit_LSB;
     SPI_InitStructure.SPI_CRCPolynomial     = 7;
     SPI_Init(SPI2, &SPI_InitStructure);                                /*  SPI基本配置                   */
@@ -542,17 +544,27 @@ static void ShellCallback_GetRecord(char* arg) {
         return;
     }
     
-    if (arg != NULL) { 
-        tmpListCnt = tmpListCnt <= atoi(&arg[1]) ? tmpListCnt : atoi(&arg[1]);
-
-        if((arg[0] != '-') || ( tmpListCnt == 0)) {
-            Debug(SPI_DEBUG, "%s", ErrArgument);
+    if (arg != NULL) {
+        if((arg[0] != '-') || (( arg[1] != 'f') && !isdigit(arg[1]))) {
+            ShellPakaged(ErrArgument);
             return;
         }
+
+        if( arg[1] == 'f') {
+            if (listGetCount(screenInfo.TriList) > 0) {
+                memFreeList(TriMem, screenInfo.TriList);
+                FlashOperate(FlashOp_TimestampEraser);
+                screenMsg.cRecord(0);
+                screenMsg.cTriRecord(0);
+            }
+            return;
+        }
+        
+        tmpListCnt = tmpListCnt <= atoi(&arg[1]) ? tmpListCnt : atoi(&arg[1]);
     }
     
     ShellPakaged("%s", RecordHead);
-    tmpNode = listGetFirst(TriList);
+    tmpNode = listGetLast(TriList);
     if (tmpNode == (tNode*)0) {
         return;
     }
@@ -591,7 +603,7 @@ static void ShellCallback_GetRecord(char* arg) {
 
         ShellPakaged("%s", tmpBuff);
         
-        tmpNode = listGetNext(TriList, tmpNode);
+        tmpNode = listGetPrev(TriList, tmpNode);
         if (tmpNode == (tNode*)0) {
             break;
         }
@@ -617,7 +629,7 @@ static void ShellCallback_OutDelay(char *arg) {
     if (arg == NULL) {                                                 /*  显示所有通道延迟值            */
         ShellPakaged("%s", DelayHead);
         
-        for (uint8_t i =0; i < 11; i++) {
+        for (uint8_t i =0; i < 12; i++) {
             tmpIndex   = sprintf(tmpBuff, "   %2u       \033[34;1m", i + 1);
             
             if (i < 4) {                                               /*  光输出通道                    */
@@ -640,20 +652,24 @@ static void ShellCallback_OutDelay(char *arg) {
     } else {                                                           /*  设置指定通道延迟值            */
         
         if((arg[0] != '-') || ((arg[1] != 'p') && (arg[1] != 'e'))) {  /*  参数有效性检测                */
-            Debug(SPI_DEBUG, "%s", ErrArgument);
+            ShellPakaged(ErrArgument);
             return;
         }
         
-        tmpCh = atoi(&arg[2]);
+        tmpCh = atoi(&arg[3]);
         
         if (tmpCh == 0) {                                              /*  参数有效性检测                */
-            Debug(SPI_DEBUG, "%s", ErrArgument);
+            ShellPakaged(ErrArgument);
             return;
         }
         
+        if (((arg[1] == 'p') && (tmpCh > 4)) || ((arg[1] == 'e') && (tmpCh > 8))) {
+            ShellPakaged(ErrArgument);
+            return;
+        }
         token = strtok(NULL, DELIM);
         if (token == NULL) {                                           /*  参数有效性检测                */
-            Debug(SPI_DEBUG, "%s", FewArgument);
+            ShellPakaged(FewArgument);
             return;
         }
         
@@ -672,7 +688,7 @@ static void ShellCallback_OutDelay(char *arg) {
 
             if (tmpPre > 3){
                 *token = '\0';
-                Debug(SPI_DEBUG, "Exceeds maximum accuracy. delta(t) = 0.01 us"endl);
+                ShellPakaged("Exceeds maximum accuracy. delta(t) = 0.01 us"endl);
                 break;
             }
             token++;
@@ -684,7 +700,7 @@ static void ShellCallback_OutDelay(char *arg) {
         
         if (tmpValue > 0x5F5E100) {                                    /*  1秒                           */
             tmpValue = 0x5F5E100;  
-            Debug(SPI_DEBUG, "The delay time is greater than 1 second."endl);
+            ShellPakaged("The delay time is greater than 1 second."endl);
         }
         
         if (arg[1] == 'p') {
@@ -717,13 +733,13 @@ static void ShellCallback_DelayTri(char *arg) {
                      Config.triDelay / 100, Config.triDelay % 100);
     } else {
         if((arg[0] != '-') || (arg[1] != 'p')) {                       /*  参数有效性检测                */
-            Debug(SPI_DEBUG, "%s", ErrArgument);
+            ShellPakaged(ErrArgument);
             return;
         }
         
         token = strtok(NULL, DELIM);
         if (token == NULL) {                                           /*  参数有效性检测                */
-            Debug(SPI_DEBUG, "%s", FewArgument);
+            ShellPakaged(FewArgument);
             return;
         }
         
@@ -742,7 +758,7 @@ static void ShellCallback_DelayTri(char *arg) {
 
             if (tmpPre > 3){
                 *token = '\0';
-                Debug(SPI_DEBUG, "Exceeds maximum accuracy. delta(t) = 0.01 us"endl);
+                ShellPakaged("Exceeds maximum accuracy. delta(t) = 0.01 us"endl);
                 break;
             }
             token++;
@@ -754,7 +770,7 @@ static void ShellCallback_DelayTri(char *arg) {
         
         if (tmpValue > 0x3B9AC9FF) {                                   /*  10秒                          */
             tmpValue = 0x3B9AC9FF;  
-            Debug(SPI_DEBUG, "The delay time is greater than 1 second."endl);
+            ShellPakaged("The delay time is greater than 1 second."endl);
         }
         
         Config.triDelay = tmpValue;

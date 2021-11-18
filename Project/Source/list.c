@@ -80,6 +80,23 @@ tNode* listGetNext(tList *list, tNode *node) {
 }
 
 /*
+    返回当前节点的前一个节点
+*/
+tNode* listGetPrev(tList *list, tNode *node) {
+    tNode* prev = (tNode*)0;
+    
+    if ((list == (tList*)0) || (node == (tNode*)0)) {
+        return prev;
+    }
+    
+    if (node->prevNode != &(list->headNode)) {
+        prev = node->prevNode;
+    }
+    
+    return prev;
+}
+
+/*
     删除链表第一个节点
 */
 tNode* listRemoveFirst(tList* list) {

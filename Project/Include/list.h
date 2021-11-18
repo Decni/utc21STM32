@@ -21,6 +21,7 @@ int32_t listGetCount(tList *list);                                     /*  »ñÈ¡Á
 tNode* listGetFirst(tList *list);                                      /*  »ñÈ¡Á´±íµÚÒ»¸ö½Úµã            */
 tNode* listGetLast(tList *list);                                       /*  »ñÈ¡Á´±í×îºóÒ»¸ö½Úµã          */
 tNode* listGetNext(tList *list, tNode *node);                          /*  »ñÈ¡Á´±íÖĞµ±Ç°½ÚµãµÄÏÂÒ»¸ö½Úµã*/ 
+tNode* listGetPrev(tList *list, tNode *node);
 tNode* listRemoveFirst(tList* list);                                   /*  É¾³ıÁ´±íµÚÒ»¸ö½Úµã            */
 tNode* listRemoveLast(tList* list);                                    /*  É¾³ıÁ´±í×îºóÒ»¸ö½Úµã          */
 void listRemoveAll(tList* list);                                       /*  É¾³ıÁ´±íËùÓĞ½Úµã              */

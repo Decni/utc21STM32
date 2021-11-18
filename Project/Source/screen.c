@@ -2008,8 +2008,10 @@ void ScreenProcess(void) {
                         
                         case RECORD:                                   /*  数据记录界面                  */
                             if (*(pMsgIndex + 4) == 0x03) {            /*  删除记录键按下                */
-                                memFreeList(TriMem, screenInfo.TriList);
-                                FlashOperate(FlashOp_TimestampEraser);
+                                if (listGetCount(screenInfo.TriList) > 0) {
+                                    memFreeList(TriMem, screenInfo.TriList);
+                                    FlashOperate(FlashOp_TimestampEraser);
+                                }
                             } else if (*(pMsgIndex + 4) == 0x02) {
                                                                        /*  返回键按下                    */
                             }
@@ -2183,7 +2185,7 @@ __STATIC_INLINE void PowerOff_Screen(void) {
 */
 static void ShellCallback_ScreenPower (char *arg) {
     if((arg[0] != '-') || ((arg[1] != 'n') && (arg[1] != 'f'))) {      /*  参数有效性检测                */
-        Debug(SCREEN_DEBUG, "%s", ErrArgument);
+        ShellPakaged(ErrArgument);
         return;
     }
     
