@@ -54,30 +54,30 @@ typedef struct _configData {
     uint32_t eo6;
     uint32_t eo7;
     uint32_t eo8;                                                      /*  每个输出通道的延迟时间        */
-    
-    uint32_t triDelay;                                                 /*  定时触发的时间                */
 }tConfig;
 
 typedef enum _msgMask {
-    Mask_triDelay =  1,
-    Mask_EO1      =  2,
-    Mask_EO2      =  3,
-    Mask_EO3      =  4,
-    Mask_EO4      =  5,
-    Mask_EO5      =  6,
-    Mask_EO6      =  7,
-    Mask_EO7      =  8,
-    Mask_EO8      =  9,
-    Mask_PO1      = 10,
-    Mask_PO2      = 11,
-    Mask_PO3      = 12,
-    Mask_PO4      = 13,
-    Mask_GPS      = 14,
-    Mask_GPSB     = 15,
+    Mask_TIMEDTRIGS =  0,                                              /*  定时触发 秒                   */
+    Mask_TIMEDTRIGM =  1,                                              /*  定时触发 毫秒                 */
+    Mask_EO1        =  2,
+    Mask_EO2        =  3,
+    Mask_EO3        =  4,
+    Mask_EO4        =  5,
+    Mask_EO5        =  6,
+    Mask_EO6        =  7,
+    Mask_EO7        =  8,
+    Mask_EO8        =  9,
+    Mask_PO1        = 10,
+    Mask_PO2        = 11,
+    Mask_PO3        = 12,
+    Mask_PO4        = 13,
+    Mask_GPS        = 14,
+    Mask_GPSB       = 15,
 }tMsgMask;
 
 typedef enum _mode {
-    Mode_DelayGo,
+    Mode_Timed_Go,
+    Mode_Timed_Stop,
     Mode_Stop,
     Mode_Run,
     Mode_DelayTri,
@@ -108,6 +108,7 @@ typedef enum _fpgaState {
 extern tList     *TriList;
 extern tMemory   *TriMem;
 extern tConfig    Config;
+extern struct tm  TimedTrig;
 extern tFpgaState FPGA_State;
 extern uint32_t   SpiTimer_tCntR;
 

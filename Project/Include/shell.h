@@ -80,7 +80,7 @@ extern const char *ErrArgument;
 extern const char DELIM[];
 
 void ComInit_Shell (uint32_t USART_BaudRate);                          /*  Shell串口初始化函数           */
-//void ShellPakaged(const char* msg);                                    /*  shell打包函数                 */
+//void ShellPakaged(const char* msg);                                  /*  shell打包函数                 */
 void ShellPakaged(const char* format, ...);
 void ShellTransmit(void);                                              /*  shell发送函数                 */
 void ShellReceve(void);                                                /*  shell接收函数                 */

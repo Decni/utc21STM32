@@ -7,9 +7,10 @@
 
 uint8_t FlashConfig[2048]    __at(0x0807E000);                         /*  ҳ252 0x0807E000 - 0x0807E7FF */ 
 uint8_t FlashTimestamp[2048] __at(0x0807E800);                         /*  ҳ253 0x0807E800 - 0x0807EFFF */
-//uint8_t FlashConfig[2048]    __at(0x0807F000);                       /*  ҳ254 0x0807F000 - 0x0807F7FF */ 
-//uint8_t FlashTimestamp[2048] __at(0x0807F8000);                      /*  ҳ255 0x0807F800 - 0x0807FFFF */ 
-
+#if 0
+uint8_t FlashConfig[2048]    __at(0x0807F000);                         /*  ҳ254 0x0807F000 - 0x0807F7FF */ 
+uint8_t FlashTimestamp[2048] __at(0x0807F8000);                        /*  ҳ255 0x0807F800 - 0x0807FFFF */ 
+#endif
 const char MemHead[4] = {'H','E','A','D'}; 
 const char MemEnd[4]  = {'E','N','D',' '};
 

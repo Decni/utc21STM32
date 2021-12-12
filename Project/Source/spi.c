@@ -10,9 +10,10 @@
 #include "screen.h"
 #include "shell.h"
 
-tList    *TriList;
-tMemory  *TriMem;
-tConfig  Config;
+tList     *TriList;
+tMemory   *TriMem;
+tConfig    Config;
+struct tm  TimedTrig = {0};
 
 const char *RecordHead    = " Number | Channel |           Timestamp           "endl;
 //                          "   01       EO1     2021-09-27 23:18:26.539.906.83\r"
@@ -28,10 +29,6 @@ const char *OutDelayHelp  = "        "Blue(od)": out delay  delta(t) = 0.01 us."
                             "   [-pox n] Set POx Value To n us."endl
                             "   [-eox n] Set EOx Value To n us.(n(us). x = 1,2,3...)"endl
                             "       [-h] Show od help."endl;
-const char *DelayTriHelp  = "        "Blue(dt)": delay trigger delta(t) = 0.01 us."endl
-                            "        [ ] Show Delay Value."endl
-                            "     [-p n] Set Delay Value To n us."endl
-                            "       [-h] Show dt help."endl;
 const char *ResetFpgaHelp = "        "Blue(rf)": reset fpga."endl
                             "        [ ] Reset FPGA."endl
                             "       [-h] Show rf help."endl;
@@ -56,7 +53,6 @@ static void DMA_Config_SPI (void);
 static void SpecialPinInit(void);
 static void ShellCallback_GetRecord(char* arg);
 static void ShellCallback_OutDelay(char *arg);
-static void ShellCallback_DelayTri(char *arg);
 static void ShellCallback_ResetFPGA (char *arg);
 
 /*  
@@ -113,7 +109,6 @@ static void ShellCallback_ResetFPGA (char *arg);
     SpecialPinInit();                                                  /*  专用管脚初始化                */
     ShellCmdAdd("ts", ShellCallback_GetRecord, TimestampHelp);
     ShellCmdAdd("od", ShellCallback_OutDelay, OutDelayHelp);
-    ShellCmdAdd("dt", ShellCallback_DelayTri, DelayTriHelp);
     ShellCmdAdd("rf", ShellCallback_ResetFPGA, ResetFpgaHelp);
     Debug(SPI_DEBUG, "SPI2 Initialization is Complete!"endl);
 }
@@ -289,7 +284,6 @@ void SpiTransmit (void) {
     }
 }
 
-
 /*
     打包要发送的数据
 */
@@ -370,6 +364,18 @@ static void SpecialPinInit(void) {
     GPIO_Init(GPIOA, &GPIO_InitStructure);                             /*  PA0     复位FPGA              */
     GPIO_SetBits(GPIOA,GPIO_Pin_0);
     
+    GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_5;
+    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_IPU;
+    GPIO_Init(GPIOA, &GPIO_InitStructure);                             /*  PA5     定时结束              */
+    
+    GPIO_EXTILineConfig(GPIO_PortSourceGPIOA, GPIO_PinSource5);
+    
+    EXTI_InitStructure.EXTI_Line    = EXTI_Line5; 
+    EXTI_InitStructure.EXTI_Mode    = EXTI_Mode_Interrupt; 
+    EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising;             /*  定时结束，上升沿锁定          */
+    EXTI_InitStructure.EXTI_LineCmd = ENABLE;
+    EXTI_Init(&EXTI_InitStructure);
+    
     GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_6;
     GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_IPU;
     GPIO_Init(GPIOA, &GPIO_InitStructure);                             /*  PA6     pps LOCK(1)           */
@@ -381,7 +387,7 @@ static void SpecialPinInit(void) {
     EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising_Falling;     /*  上升沿锁定，下降沿守时        */
     EXTI_InitStructure.EXTI_LineCmd = ENABLE;
     EXTI_Init(&EXTI_InitStructure);
-
+    
     NVIC_InitStructure.NVIC_IRQChannel                   = EXTI9_5_IRQn;
     NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
     NVIC_InitStructure.NVIC_IRQChannelSubPriority        = 2;
@@ -391,7 +397,7 @@ static void SpecialPinInit(void) {
     GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_7;
     GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_Out_PP;
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-    GPIO_Init(GPIOA, &GPIO_InitStructure);                             /*  PA7     发送1和接收0          */
+    GPIO_Init(GPIOA, &GPIO_InitStructure);                             /*  PA7     发送1  接收0          */
     GPIO_SetBits(GPIOA,GPIO_Pin_7);
     
     GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_0;
@@ -418,20 +424,35 @@ static void SpecialPinInit(void) {
 }
 
 /* 
-    pps 锁定信号
+    外部触发中断9_5
 */
-void EXTI9_5_IRQHandler(void)
-{
+void EXTI9_5_IRQHandler(void) {
     uint8_t tmpArg;
-     if (EXTI_GetITStatus(EXTI_Line6)) {
-         EXTI_ClearITPendingBit(EXTI_Line6);
-         if (GPIOA->IDR & GPIO_Pin_6) {                                /*  上升沿                        */
-            tmpArg = 0x01;
-         } else {
-            tmpArg = 0x02; 
-         }
-         screenMsg.wLock(&tmpArg);
+    if (EXTI_GetITStatus(EXTI_Line5)) {                                /*  定时结束 上升沿               */
+        EXTI_ClearITPendingBit(EXTI_Line5);
+        NotifyFPGA(Mode_Timed_Stop);
+        tmpArg = 0x00;
+        screenMsg.wTimed(&tmpArg);                                     /*  弹起定时器按键                */
+        tmpArg = 0x01;
+        screenMsg.wMode(&tmpArg);                                      /*  使能模式切换按键              */
+        screenMsg.wBack(&tmpArg);                                      /*  使能返回按键                  */
+        screenMsg.wBrake(&tmpArg);                                     /*  使能刹车按键                  */
+        Debug(SPI_DEBUG, "Timed Trigger Complete!"endl);
      }
+    
+    if (EXTI_GetITStatus(EXTI_Line6)) {
+        EXTI_ClearITPendingBit(EXTI_Line6);
+        if (GPIOA->IDR & GPIO_Pin_6) {                                 /*  pps lock 双沿                 */
+            tmpArg = 0x01;
+            Debug(SPI_DEBUG, "Clock Lock!"endl);
+        } else {
+            tmpArg = 0x02; 
+            Debug(SPI_DEBUG, "Clock Unlock!"endl);
+        }
+        if (screenInfo.ID != UNKNOW) {
+            screenMsg.wLock(&tmpArg);
+        }
+    }
 }
 
 /*
@@ -439,19 +460,26 @@ void EXTI9_5_IRQHandler(void)
 */
 void NotifyFPGA(tMode mode) {
     switch (mode) {
-        case Mode_DelayGo:                                             /*  启动定时触发                  */
+        case Mode_Timed_Go:                                            /*  启动定时触发                  */
             GPIO_SetBits(GPIOC,GPIO_Pin_0);
+            Debug(SPI_DEBUG, "Start Timed Trigger!"endl);
+            break;
+        
+        case Mode_Timed_Stop:                                          /*  停止定时触发                  */
             GPIO_ResetBits(GPIOC,GPIO_Pin_0);
+            Debug(SPI_DEBUG, "Stop Timed Trigger!"endl);
             break;
         
         case Mode_Stop:                                                /*  刹车                          */
             GPIO_ResetBits(GPIOC,GPIO_Pin_1);
             screenInfo.RunMode = Mode_Stop;
+            Debug(SPI_DEBUG, "To Brake Mode!"endl);
             break;
         
         case Mode_Run:                                                 /*  取消刹车                      */
             GPIO_SetBits(GPIOC,GPIO_Pin_1);
             screenInfo.RunMode = Mode_Run;
+            Debug(SPI_DEBUG, "Out Brake Mode!"endl);
             break;
         
         case Mode_DelayTri:                                            /*  定时触发模式                  */
@@ -504,7 +532,6 @@ void TimerProcess_SPI(void) {
             SpiPackaged(Mask_EO6, Config.eo6 * CONFIG_FACTOR);
             SpiPackaged(Mask_EO7, Config.eo7 * CONFIG_FACTOR);
             SpiPackaged(Mask_EO8, Config.eo8 * CONFIG_FACTOR);
-            SpiPackaged(Mask_triDelay, Config.triDelay * CONFIG_FACTOR);
             FPGA_State = FPGA_RESET;
         }
     }
@@ -564,7 +591,7 @@ static void ShellCallback_GetRecord(char* arg) {
     }
     
     ShellPakaged("%s", RecordHead);
-    tmpNode = listGetLast(TriList);
+    tmpNode = listGetFirst(TriList);
     if (tmpNode == (tNode*)0) {
         return;
     }
@@ -581,7 +608,7 @@ static void ShellCallback_GetRecord(char* arg) {
         
         if (tmpTriNode->time.item.num > 3) {                           /*  通道号                        */
             tmpBuff[tmpIndex++]   = 'P';
-            tmpBuff[tmpIndex + 1] = '0' + tmpTriNode->time.item.num % 4;
+            tmpBuff[tmpIndex + 1] = '1' + tmpTriNode->time.item.num % 4;
         } else if (tmpTriNode->time.item.num > 0) {
         
             tmpBuff[tmpIndex++]   = 'E';
@@ -603,7 +630,7 @@ static void ShellCallback_GetRecord(char* arg) {
 
         ShellPakaged("%s", tmpBuff);
         
-        tmpNode = listGetPrev(TriList, tmpNode);
+        tmpNode = listGetNext(TriList, tmpNode);
         if (tmpNode == (tNode*)0) {
             break;
         }
@@ -719,68 +746,6 @@ static void ShellCallback_OutDelay(char *arg) {
 }
 
 /*
-    获取或设置延迟触发时间
-*/
-static void ShellCallback_DelayTri(char *arg) {
-    char *token;
-    char  tmpStr[20] = {0};
-    uint8_t tmpPre = 0;
-    long double tmpInput;
-    uint32_t    tmpValue;
-    
-    if (arg == NULL) {
-        ShellPakaged(Blue(Delay Trigger:)" %7u.%.2u(us)"endl,
-                     Config.triDelay / 100, Config.triDelay % 100);
-    } else {
-        if((arg[0] != '-') || (arg[1] != 'p')) {                       /*  参数有效性检测                */
-            ShellPakaged(ErrArgument);
-            return;
-        }
-        
-        token = strtok(NULL, DELIM);
-        if (token == NULL) {                                           /*  参数有效性检测                */
-            ShellPakaged(FewArgument);
-            return;
-        }
-        
-        sscanf(token, "%[0123456789.]", tmpStr);                       /*  参数过滤                      */
-        token = tmpStr;
-        
-        while (*token != '\0') { 
-            
-            if (tmpPre > 0) {
-                tmpPre++;
-            }
-            
-            if (*token == '.') {
-                tmpPre++;
-            }
-
-            if (tmpPre > 3){
-                *token = '\0';
-                ShellPakaged("Exceeds maximum accuracy. delta(t) = 0.01 us"endl);
-                break;
-            }
-            token++;
-        }                                                              /*  保留两位小数                  */
-        
-        sscanf(tmpStr, "%10Lf", &tmpInput);
-        
-        tmpValue = (uint32_t)(tmpInput * 100);                         /*  单位 10 ns                    */
-        
-        if (tmpValue > 0x3B9AC9FF) {                                   /*  10秒                          */
-            tmpValue = 0x3B9AC9FF;  
-            ShellPakaged("The delay time is greater than 1 second."endl);
-        }
-        
-        Config.triDelay = tmpValue;
-        SpiPackaged(Mask_triDelay, tmpValue * CONFIG_FACTOR);
-        FlashOperate(FlashOp_ConfigSave);
-        screenMsg.wTriDelay(0);
-    }
-}
-
-/*
     复位 FPGA
 */
 static void ShellCallback_ResetFPGA (char *arg) {
@@ -797,7 +762,6 @@ static void ShellCallback_ResetFPGA (char *arg) {
     SpiPackaged(Mask_EO6, Config.eo6 * CONFIG_FACTOR);
     SpiPackaged(Mask_EO7, Config.eo7 * CONFIG_FACTOR);
     SpiPackaged(Mask_EO8, Config.eo8 * CONFIG_FACTOR);
-    SpiPackaged(Mask_triDelay, Config.triDelay * CONFIG_FACTOR);
     FPGA_State = FPGA_RESET;
     
 }

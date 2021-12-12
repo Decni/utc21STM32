@@ -36,8 +36,6 @@ typedef struct _screenMsg {
     pvFun cTriDate;
     pvFun wTriTime;
     pvFun cTriTime;
-    pvFun wTriDelay;
-    pvFun cTriDelay;
     pvFun wTriRecord;
     pvFun cTriRecord;
     pvFun wRecord;
@@ -62,7 +60,10 @@ typedef struct _screenMsg {
     pvFun wNrToTest;
     pvFun wNrToRecord;
     pvFun wLock;
-    pvFun wCtrl;
+    pvFun wBrake;
+    pvFun wBack;
+    pvFun wMode;
+    pvFun wTimed;
 }tScreenMsg;
 
 

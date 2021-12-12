@@ -247,7 +247,7 @@ static void ScreenMsg_wTriChannel (void *arg) {
 
     if (tmpTriNode->time.item.num > 3) {
         tmpTxNode->buff[tmpTxNode->msgCnt++]   = 'P';
-        tmpTxNode->buff[tmpTxNode->msgCnt + 1] = '0' + tmpTriNode->time.item.num % 4;
+        tmpTxNode->buff[tmpTxNode->msgCnt + 1] = '1' + tmpTriNode->time.item.num % 4;
     } else if (tmpTriNode->time.item.num > 0) {
         
         tmpTxNode->buff[tmpTxNode->msgCnt++]   = 'E';
@@ -428,6 +428,7 @@ static void ScreenMsg_wTriTime (void *arg) {
     tmpTriNode = (tTriDataNode*)0;
 }
 
+#if 0
 /*
     清除测试界面定时触发时间
 */
@@ -456,6 +457,7 @@ static void ScreenMsg_cTriDelay (void *arg) {
     listAddLast(&ScreenTxList, &(tmpTxNode->node));
     tmpTxNode = (tScreenTxNode*)0;
 }
+
 
 /*
     更新测试界面定时触发时间
@@ -491,6 +493,7 @@ static void ScreenMsg_wTriDelay (void *arg) {
     listAddFirst(&ScreenTxList, &(tmpTxNode->node));
     tmpTxNode = (tScreenTxNode*)0;
 }
+#endif
 
 /*
     清除测试界面触发记录
@@ -578,7 +581,7 @@ static void ScreenMsg_wTriRecord (void *arg) {
         
         if (tmpTriNode->time.item.num > 3) {
             tmpTxNode->buff[tmpTxNode->msgCnt++]   = 'P';
-            tmpTxNode->buff[tmpTxNode->msgCnt + 1] = '0' + tmpTriNode->time.item.num % 4;
+            tmpTxNode->buff[tmpTxNode->msgCnt + 1] = '1' + tmpTriNode->time.item.num % 4;
         } else if (tmpTriNode->time.item.num > 0) {
         
             tmpTxNode->buff[tmpTxNode->msgCnt++]   = 'E';
@@ -697,7 +700,7 @@ static void ScreenMsg_wRecord (void *arg) {
 
         if (tmpTriNode->time.item.num > 3) {
             tmpTxNode->buff[tmpTxNode->msgCnt++]   = 'P';
-            tmpTxNode->buff[tmpTxNode->msgCnt + 1] = '0' + tmpTriNode->time.item.num % 4;
+            tmpTxNode->buff[tmpTxNode->msgCnt + 1] = '1' + tmpTriNode->time.item.num % 4;
         } else if (tmpTriNode->time.item.num > 0) {
 
             tmpTxNode->buff[tmpTxNode->msgCnt++]   = 'E';
@@ -1393,7 +1396,7 @@ static void ScreenMsg_wTriBatch (void *arg) {
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x03;
     if (tmpTriNode->time.item.num > 3) {
         tmpTxNode->buff[tmpTxNode->msgCnt++]   = 'P';
-        tmpTxNode->buff[tmpTxNode->msgCnt + 1] = '0' + tmpTriNode->time.item.num % 4;
+        tmpTxNode->buff[tmpTxNode->msgCnt + 1] = '1' + tmpTriNode->time.item.num % 4;
     } else if (tmpTriNode->time.item.num > 0) {
     
         tmpTxNode->buff[tmpTxNode->msgCnt++]   = 'E';
@@ -1486,7 +1489,7 @@ static void ScreenMsg_wNrToTest (void *arg) {
     
     if (tmpTriNode->time.item.num > 3) {
         tmpTxNode->buff[tmpTxNode->msgCnt++]   = 'P';
-        tmpTxNode->buff[tmpTxNode->msgCnt + 1] = '0' + tmpTriNode->time.item.num % 4;
+        tmpTxNode->buff[tmpTxNode->msgCnt + 1] = '1' + tmpTriNode->time.item.num % 4;
     } else if (tmpTriNode->time.item.num > 0) {
     
         tmpTxNode->buff[tmpTxNode->msgCnt++]   = 'E';
@@ -1572,7 +1575,7 @@ static void ScreenMsg_wNrToRecord (void *arg) {
     
     if (tmpTriNode->time.item.num > 3) {
         tmpTxNode->buff[tmpTxNode->msgCnt++]   = 'P';
-        tmpTxNode->buff[tmpTxNode->msgCnt + 1] = '0' + tmpTriNode->time.item.num % 4;
+        tmpTxNode->buff[tmpTxNode->msgCnt + 1] = '1' + tmpTriNode->time.item.num % 4;
     } else if (tmpTriNode->time.item.num > 0) {
     
         tmpTxNode->buff[tmpTxNode->msgCnt++]   = 'E';
@@ -1635,9 +1638,9 @@ static void ScreenMsg_wLock (void *arg) {
 }
 
 /*
-    使能或禁止控件
+    使能或禁止刹车控件
 */
-static void ScreenMsg_wCtrl (void *arg) {
+static void ScreenMsg_wBrake (void *arg) {
     tScreenTxNode *tmpTxNode;
     
     tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
@@ -1654,6 +1657,96 @@ static void ScreenMsg_wCtrl (void *arg) {
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x03;
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x00;
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x07;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = (*(uint8_t*)arg) & 0x01; 
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFF;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFC;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFF;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFF;
+    
+    listAddLast(&ScreenTxList, &(tmpTxNode->node));
+    tmpTxNode = (tScreenTxNode*)0;
+}
+
+/*
+    使能或禁止返回控件
+*/
+static void ScreenMsg_wBack (void *arg) {
+    tScreenTxNode *tmpTxNode;
+    
+    tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
+    if (tmpTxNode == (tScreenTxNode*)0) {
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
+        return;
+    }
+    tmpTxNode->msgCnt = 0;
+    
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xEE;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xB1;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x04;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x00;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x03;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x00;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x08;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = (*(uint8_t*)arg) & 0x01; 
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFF;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFC;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFF;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFF;
+    
+    listAddLast(&ScreenTxList, &(tmpTxNode->node));
+    tmpTxNode = (tScreenTxNode*)0;
+}
+
+/*
+    使能或禁止模式转换控件
+*/
+static void ScreenMsg_wMode (void *arg) {
+    tScreenTxNode *tmpTxNode;
+    
+    tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
+    if (tmpTxNode == (tScreenTxNode*)0) {
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
+        return;
+    }
+    tmpTxNode->msgCnt = 0;
+    
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xEE;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xB1;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x04;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x00;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x03;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x00;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x09;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = (*(uint8_t*)arg) & 0x01; 
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFF;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFC;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFF;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFF;
+    
+    listAddLast(&ScreenTxList, &(tmpTxNode->node));
+    tmpTxNode = (tScreenTxNode*)0;
+}
+
+/*
+    弹起或按下定时器控件
+*/
+static void ScreenMsg_wTimed (void *arg) {
+    tScreenTxNode *tmpTxNode;
+    
+    tmpTxNode = (tScreenTxNode*)memGet(&ScreenTxMem);                  /*  申请一块内存                  */
+    if (tmpTxNode == (tScreenTxNode*)0) {
+        Debug(SCREEN_DEBUG, Red(ERROR)": Out of Memrmory!"endl);
+        return;
+    }
+    tmpTxNode->msgCnt = 0;
+    
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xEE;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xB1;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x10;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x00;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x03;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x00;
+    tmpTxNode->buff[tmpTxNode->msgCnt++] = 0x06;
     tmpTxNode->buff[tmpTxNode->msgCnt++] = (*(uint8_t*)arg) & 0x01; 
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFF;
     tmpTxNode->buff[tmpTxNode->msgCnt++] = 0xFC;
@@ -1727,7 +1820,7 @@ void ScreenProcess(void) {
     uint8_t       *pMsgEnd, *pMsgIndex;
     uint8_t        tmpArg;
     uint32_t       outDelay = 0;
-    uint32_t       triDelay = 0;
+    uint32_t       tmpTimed = 0;
     long double    tmpData  = 0;
     struct tm      rtcDate  = {0};
     time_t         t_time   = 0;
@@ -1765,6 +1858,9 @@ void ScreenProcess(void) {
             rtcDate.tm_mday = ((*pMsgIndex) >> 4) * 10 + ((*pMsgIndex) & 0x0F);
             t_time = mktime(&rtcDate);
             SpiPackaged(Mask_GPSB, t_time);
+            TimedTrig.tm_year = rtcDate.tm_year;
+            TimedTrig.tm_mon  = rtcDate.tm_mon;
+            TimedTrig.tm_mday = rtcDate.tm_mday;
             Debug(SCREEN_DEBUG, Red(CONFIG)" FPGA IRIG-B Time to %#lx"endl, t_time);
             Debug(SCREEN_DEBUG, "Now: %s"endl, asctime(&rtcDate));
             pMsgIndex += 4;
@@ -1774,15 +1870,17 @@ void ScreenProcess(void) {
             if (*((uint32_t*)pMsgIndex) == 0xFFFFFCFF) {               /*  校验包尾                      */
                 screenInfo.Power = true;
                 screenMsg.wSetBatch(0);
-                screenMsg.wTriDelay(0);
                 if (FPGA_State >= FPGA_WORK) {
                     tmpArg = 1;
+                    NotifyFPGA(Mode_Stop);
+                    NotifyFPGA(Mode_Timed_Stop);
+                    NotifyFPGA(Mode_DelayTri);
                 } else {
                     tmpArg = 0;
                     screenMsg.rRtc(0);
                 }
                 screenMsg.wLock(&tmpArg);
-                screenMsg.wCtrl(&tmpArg);
+                screenMsg.wBrake(&tmpArg);
                 screenMsg.wTriRecord(0);
                 screenMsg.wRecord(0);                                  /*  更新缓存在 flash 中的数据     */
                 Debug(SCREEN_DEBUG, "Screen Power On."endl);
@@ -1948,28 +2046,60 @@ void ScreenProcess(void) {
                                 default:
                                     break;
                             }
-                            pMsgIndex += 7;
+                            pMsgIndex += 11;
                             break;
                             
                         case TESTING:                                  /*  测试界面                      */
-                            if (*(pMsgIndex + 4) == 0x04) {            /*  定时触发值                    */
-                                if (*(pMsgIndex + 6) != 0) {
-                                        sscanf((const char*)(pMsgIndex + 6), 
-                                                         "%Lf[0123456789.]", &tmpData);
-                                        triDelay = (uint32_t)(tmpData * 100);
-                                    }
-
-                                screenInfo.Config->triDelay = triDelay;
-                                SpiPackaged(Mask_triDelay, screenInfo.Config->triDelay * CONFIG_FACTOR);
-                                FlashOperate(FlashOp_ConfigSave);
-                                pMsgIndex += 7;
-                                break;
-                            }
                             
                             switch (*(pMsgIndex + 4)) {
                                 
-                                case 0x06:                             /*  启动定时触发                  */
-                                    NotifyFPGA(Mode_DelayGo);
+                                case 0x04:                             /*  hour                          */
+                                    if (*(pMsgIndex + 6) != 0) {
+                                        sscanf((const char*)(pMsgIndex + 6), 
+                                                         "%d[0123456789]", &(TimedTrig.tm_hour));
+                                    }
+                                    Debug(SCREEN_DEBUG, "Timed Trigger hour %d"endl, TimedTrig.tm_hour);
+                                    break;
+                                
+                                case 0x0C:                             /*  min                           */
+                                    if (*(pMsgIndex + 6) != 0) {
+                                        sscanf((const char*)(pMsgIndex + 6), 
+                                                         "%d[0123456789]", &(TimedTrig.tm_min));
+                                    }
+                                    Debug(SCREEN_DEBUG, "Timed Trigger min %d"endl, TimedTrig.tm_min);
+                                    break;
+                                
+                                case 0x0D:                             /*  sec                           */
+                                    if (*(pMsgIndex + 6) != 0) {
+                                        sscanf((const char*)(pMsgIndex + 6), 
+                                                         "%d[0123456789]", &(TimedTrig.tm_sec));
+                                    }
+                                    Debug(SCREEN_DEBUG, "Timed Trigger sec %d"endl, TimedTrig.tm_sec);
+                                    break;
+                                
+                                case 0x0E:                             /*  ms                            */
+                                    if (*(pMsgIndex + 6) != 0) {
+                                        sscanf((const char*)(pMsgIndex + 6), 
+                                                         "%d[0123456789]", &tmpTimed);
+                                        TimedTrig.__extra_1 = tmpTimed * 100000;
+                                                                       /*  ms -> 10 ns 转换              */
+                                    }
+                                    Debug(SCREEN_DEBUG, "Timed Trigger ms %d"endl, TimedTrig.__extra_1);
+                                    break;
+                                
+                                case 0x06:                             /*  启停定时触发                  */
+                                    if (*(pMsgIndex + 7) != 0) {       /*  启动定时触发                  */
+                                        t_time = mktime(&TimedTrig);
+                                        SpiPackaged(Mask_TIMEDTRIGS, t_time);
+                                        Debug(SCREEN_DEBUG, Red(CONFIG)" FPGA TimedS To %#x"endl, t_time);
+                                        SpiPackaged(Mask_TIMEDTRIGM, TimedTrig.__extra_1 * CONFIG_FACTOR);
+                                        Debug(SCREEN_DEBUG, Red(CONFIG)" FPGA TimedM To %#x"endl,
+                                                                      TimedTrig.__extra_1 * CONFIG_FACTOR);
+                                        NotifyFPGA(Mode_Timed_Go);
+                                    } else {                           /*  停止定时触发                  */
+                                        
+                                        NotifyFPGA(Mode_Timed_Stop);
+                                    }
                                     break;
 
                                 case 0x07:                             /*  刹车按键                      */
@@ -2128,8 +2258,6 @@ static void ScreenStateInit (void) {
     screenMsg.wTriDate    = ScreenMsg_wTriDate;
     screenMsg.cTriTime    = ScreenMsg_cTriTime;
     screenMsg.wTriTime    = ScreenMsg_wTriTime;
-    screenMsg.cTriDelay   = ScreenMsg_cTriDelay;
-    screenMsg.wTriDelay   = ScreenMsg_wTriDelay;
     screenMsg.cTriRecord  = ScreenMsg_cTriRecord;
     screenMsg.wTriRecord  = ScreenMsg_wTriRecord;
     screenMsg.cRecord     = ScreenMsg_cRecord;
@@ -2154,7 +2282,10 @@ static void ScreenStateInit (void) {
     screenMsg.wNrToTest   = ScreenMsg_wNrToTest;
     screenMsg.wNrToRecord = ScreenMsg_wNrToRecord;
     screenMsg.wLock       = ScreenMsg_wLock;
-    screenMsg.wCtrl       = ScreenMsg_wCtrl;
+    screenMsg.wBrake      = ScreenMsg_wBrake;
+    screenMsg.wBack       = ScreenMsg_wBack;
+    screenMsg.wMode       = ScreenMsg_wMode;
+    screenMsg.wTimed      = ScreenMsg_wTimed;
     
     screenInfo.ID         = UNKNOW;
     screenInfo.Power      = false;

@@ -100,23 +100,24 @@ static void DMA_Config_GPS(void)
     DMA_ITConfig(GPS_COM_RX_DMA1CHANNEL,DMA_IT_TE,DISABLE);
     DMA_ITConfig(GPS_COM_RX_DMA1CHANNEL,DMA_IT_HT,DISABLE);
     DMA_ITConfig(GPS_COM_RX_DMA1CHANNEL,DMA_IT_TC,DISABLE);
+#if 0
+  DMA_Cmd(GPS_COM_RX_DMA1CHANNEL,DISABLE);
+  DMA_DeInit(GPS_COM_RX_DMA1CHANNEL);	
+  DMA_InitStruct.DMA_PeripheralBaseAddr = (uint32_t)(&(GPS_COM->DR));
+  DMA_InitStruct.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;
+  DMA_InitStruct.DMA_PeripheralInc      = DMA_PeripheralInc_Disable;
+  DMA_InitStruct.DMA_MemoryBaseAddr     = (uint32_t)0;
+  DMA_InitStruct.DMA_MemoryDataSize     = DMA_MemoryDataSize_Byte;
+  DMA_InitStruct.DMA_MemoryInc          = DMA_MemoryInc_Enable;
+  DMA_InitStruct.DMA_DIR                = DMA_DIR_PeripheralDST;
+  DMA_InitStruct.DMA_BufferSize         = 0;
+  DMA_InitStruct.DMA_Priority           = DMA_Priority_VeryHigh;
+  DMA_InitStruct.DMA_Mode               = DMA_Mode_Normal;
+  DMA_InitStruct.DMA_M2M                = DMA_M2M_Disable;
+  DMA_Init(SCREEN_COM_TX_DMA1CHANNEL,&DMA_InitStruct);                 /*  接收DMA配置                   */ 
 
-//  DMA_Cmd(GPS_COM_RX_DMA1CHANNEL,DISABLE);
-//  DMA_DeInit(GPS_COM_RX_DMA1CHANNEL);	
-//  DMA_InitStruct.DMA_PeripheralBaseAddr = (uint32_t)(&(GPS_COM->DR));
-//  DMA_InitStruct.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;
-//  DMA_InitStruct.DMA_PeripheralInc      = DMA_PeripheralInc_Disable;
-//  DMA_InitStruct.DMA_MemoryBaseAddr     = (uint32_t)0;
-//  DMA_InitStruct.DMA_MemoryDataSize     = DMA_MemoryDataSize_Byte;
-//  DMA_InitStruct.DMA_MemoryInc          = DMA_MemoryInc_Enable;
-//  DMA_InitStruct.DMA_DIR                = DMA_DIR_PeripheralDST;
-//  DMA_InitStruct.DMA_BufferSize         = 0;
-//  DMA_InitStruct.DMA_Priority           = DMA_Priority_VeryHigh;
-//  DMA_InitStruct.DMA_Mode               = DMA_Mode_Normal;
-//  DMA_InitStruct.DMA_M2M                = DMA_M2M_Disable;
-//  DMA_Init(SCREEN_COM_TX_DMA1CHANNEL,&DMA_InitStruct);               /*  接收DMA配置                   */ 
-
-//  DMA_Cmd(GPS_COM_TX_DMA1CHANNEL,ENABLE);
+  DMA_Cmd(GPS_COM_TX_DMA1CHANNEL,ENABLE);
+#endif
     DMA_Cmd(GPS_COM_RX_DMA1CHANNEL,ENABLE);
 }
 
@@ -261,7 +262,7 @@ void GpsProcess (void) {
                         screenMsg.rRtc(0);
                         tmpArg = 1;
                         screenMsg.wLock(&tmpArg);
-                        screenMsg.wCtrl(&tmpArg);
+                        screenMsg.wBrake(&tmpArg);
                         FPGA_State = FPGA_WORK;
                         Debug(GPS_DEBUG, Red(CONFIG)" FPGA GPS Time To %#lx"endl, t_time);
                         Debug(GPS_DEBUG, "Now: %s"endl, asctime(localtime(&t_time)));
